@@ -1,0 +1,59 @@
+/* Biomedix Engineering design tokens — taken from the design canvas. */
+:root {
+  /* Type */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-display: 'Schibsted Grotesk', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Light ground */
+  --color-ink: #111a17;
+  --color-ink-2: #33413c;
+  --color-muted: #4a5651;
+  --color-ground: #f5f6f3;
+  --color-surface: #ffffff;
+  --color-line: #d9ddd8;
+  --color-line-soft: #eceeea;
+  --color-input-line: #c9cfca;
+
+  /* Accent (teal) */
+  --color-accent: #0d6b5a;
+  --color-accent-strong: #08493d;
+  --color-accent-light: #5fd3b5;
+  --color-mint: #e3efeb;
+  --color-mint-line: #c6ddd5;
+  --color-mint-border: #9ccbbc;
+
+  /* Night (dark) surfaces */
+  --color-night: #0f1a17;
+  --color-night-2: #16241f;
+  --color-night-3: #22332d;
+  --color-night-line: #2a3b35;
+  --color-night-border: #3b4f48;
+  --color-on-night: #eef2ef;
+  --color-on-night-2: #c9d4cf;
+  --color-on-night-3: #9fb3ab;
+
+  /* Status */
+  --color-warn-bg: #fbf0e4;
+  --color-warn-ink: #8f4a0e;
+  --color-warn-ink-strong: #6e3a0c;
+  --color-warn-night-bg: #3a2614;
+  --color-warn-night-ink: #f3b37a;
+  --color-neutral-bg: #efede6;
+
+  /* Shape and layout */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-pill: 999px;
+  --content-max: 1200px;
+  --gutter: 32px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: 16px;
+  }
+}
