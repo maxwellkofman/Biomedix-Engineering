@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, ButtonLink } from '../components/Button';
 import { missingHref, Segments } from '../components/Segments';
@@ -22,8 +22,10 @@ export function StatusPill({ doc }: { doc: GeneratedDoc }) {
 }
 
 export default function Suite() {
-  const { suite, tokens, started, submitted, loadExample } = useIntake();
+  const { suite, tokens, started, submitted, loadExample, intake } = useIntake();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const created = params.get('created') === '1';
 
   if (!started) {
     return (
@@ -35,19 +37,31 @@ export default function Suite() {
             Tell us about your company, device and team. The agents work out which procedures FDA expects for your
             device and fill in everything they can. You review what's left.
           </p>
+          <div className="mode-grid">
+            <Link to="/app/form" className="card mode-card">
+              <span className="eyebrow">SINGLE FORM</span>
+              <span className="mode-card__title">Answer one questionnaire</span>
+              <span className="card__body">
+                Every question on one page, each showing which documents it fills. Best if you have the details to hand.
+              </span>
+              <span className="mode-card__go">Open the form →</span>
+            </Link>
+            <Link to="/app/setup/company" className="card mode-card">
+              <span className="eyebrow">GUIDED</span>
+              <span className="mode-card__title">Go step by step</span>
+              <span className="card__body">Seven short steps with a live preview of your suite as you answer.</span>
+              <span className="mode-card__go">Start setup →</span>
+            </Link>
+          </div>
           <div className="button-row">
-            <ButtonLink to="/app/setup/company" size="lg">
-              Start setup
-            </ButtonLink>
             <Button
-              variant="outline"
-              size="lg"
+              variant="text"
               onClick={() => {
                 loadExample();
-                navigate('/app/suite');
+                navigate('/app/suite?created=1');
               }}
             >
-              Try it with an example device
+              Or try it with an example device
             </Button>
           </div>
         </main>
@@ -71,18 +85,42 @@ export default function Suite() {
             </p>
           </div>
           <div className="button-row">
-            <ButtonLink to="/app/setup/company" variant="outline">
+            <ButtonLink to="/app/form" variant="outline">
               Edit answers
             </ButtonLink>
             <Button
+              variant="outline"
               onClick={() =>
                 downloadText(`${(tokens.company?.value ?? 'qms').replace(/\W+/g, '-')}-documentation-suite.md`, suiteToMarkdown(suite, tokens))
               }
             >
               Export all (.md)
             </Button>
+            <ButtonLink to="/app/publish">Publish to SharePoint</ButtonLink>
           </div>
         </div>
+
+        {created && (
+          <div role="status" className="created-banner">
+            <div className="stack">
+              <strong>Your documentation is created.</strong>
+              <span>
+                {suite.applicable.length} procedures drafted, {suite.filledPct}% filled from your answers.{' '}
+                {suite.missing.length
+                  ? `${suite.missing.length} answer${suite.missing.length > 1 ? 's' : ''} would fill the rest.`
+                  : 'Nothing left to fill.'}
+              </span>
+            </div>
+            <div className="button-row">
+              <ButtonLink to="/app/publish" variant={intake.qms.docSystem === 'sharepoint' ? 'primary' : 'outline'}>
+                {intake.qms.docSystem === 'sharepoint' ? 'Set up SharePoint →' : 'Download or publish →'}
+              </ButtonLink>
+              <Button variant="text" onClick={() => setParams({}, { replace: true })}>
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="facts suite-stats">
           {[

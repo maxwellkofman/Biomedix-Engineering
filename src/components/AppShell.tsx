@@ -5,7 +5,7 @@ import { Logo } from './Logo';
 
 const NAV = [
   { label: 'Review queue', to: '/app/review' },
-  { label: 'Documentation', to: '/app/suite', also: '/app/setup' },
+  { label: 'Documentation', to: '/app/suite', also: ['/app/setup', '/app/form', '/app/publish'] },
   { label: 'Agents', to: '/app/agents' },
   { label: 'Trace graph', to: '/app/trace' },
   { label: 'Gates', to: '/app/gates' },
@@ -39,7 +39,7 @@ export function AppShell({ project = '[Company] · Example SaMD project', user, 
                   key={item.to}
                   to={item.to}
                   className={({ isActive }) =>
-                    `app-nav__link${isActive || (item.also && pathname.startsWith(item.also)) ? ' active' : ''}`
+                    `app-nav__link${isActive || item.also?.some((p) => pathname.startsWith(p)) ? ' active' : ''}`
                   }
                 >
                   {item.label}

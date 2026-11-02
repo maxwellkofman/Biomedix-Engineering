@@ -11,6 +11,10 @@ export interface Intake {
     indications: string;
     users: string;
     environment: string;
+    lifetime: string;
+    patientContact: '' | 'none' | 'surface' | 'external' | 'implant';
+    sterile: YesNo;
+    shelfLife: string;
   };
   tech: {
     hardware: YesNo;
@@ -37,6 +41,20 @@ export interface Intake {
     suppliers: string;
     qmsTools: string;
     devTools: string;
+    equipment: string;
+    labeling: '' | 'paper' | 'eifu' | 'software';
+    udiAgency: '' | 'GS1' | 'HIBCC' | 'ICCBBA';
+  };
+  qms: {
+    docSystem: '' | 'sharepoint' | 'google' | 'eqms' | 'other';
+    siteUrl: string;
+    eSignature: '' | 'biomedix' | 'docusign' | 'adobe' | 'wet-ink';
+    retention: '' | 'lifetime-2' | '10' | '15';
+    trainingDays: string;
+    capaTargets: '' | 'standard' | 'fast';
+    auditFrequency: '' | 'annual' | 'semiannual';
+    reviewFrequency: '' | 'annual' | 'semiannual' | 'quarterly';
+    complaintChannels: string;
   };
   team: {
     ceo: string;
@@ -54,7 +72,18 @@ export type IntakeSection = keyof Intake;
 
 export const EMPTY_INTAKE: Intake = {
   company: { name: '', address: '', stage: '', employees: '' },
-  device: { name: '', description: '', intendedUse: '', indications: '', users: '', environment: '' },
+  device: {
+    name: '',
+    description: '',
+    intendedUse: '',
+    indications: '',
+    users: '',
+    environment: '',
+    lifetime: '',
+    patientContact: '',
+    sterile: '',
+    shelfLife: '',
+  },
   tech: {
     hardware: '',
     software: '',
@@ -67,7 +96,27 @@ export const EMPTY_INTAKE: Intake = {
     worstHarm: '',
   },
   regulatory: { deviceClass: '', productCode: '', regulation: '', pathway: '', predicate: '', targetSubmission: '' },
-  operations: { manufacturing: '', contractManufacturer: '', suppliers: '', qmsTools: '', devTools: '' },
+  operations: {
+    manufacturing: '',
+    contractManufacturer: '',
+    suppliers: '',
+    qmsTools: '',
+    devTools: '',
+    equipment: '',
+    labeling: '',
+    udiAgency: '',
+  },
+  qms: {
+    docSystem: '',
+    siteUrl: '',
+    eSignature: '',
+    retention: '',
+    trainingDays: '',
+    capaTargets: '',
+    auditFrequency: '',
+    reviewFrequency: '',
+    complaintChannels: '',
+  },
   team: { ceo: '', managementRep: '', quality: '', engineering: '', operations: '', regulatory: '', ml: '', security: '' },
 };
 
@@ -87,6 +136,10 @@ export const EXAMPLE_INTAKE: Intake = {
       'Adult patients who are candidates for ambulatory ECG monitoring for up to 14 days, as prescribed by a physician.',
     users: 'Prescribing clinicians and cardiac technicians; patients apply and wear the patch',
     environment: 'Home use and outpatient clinics',
+    lifetime: '3 years (reusable hub); patch is single use',
+    patientContact: 'surface',
+    sterile: 'no',
+    shelfLife: '18 months',
   },
   tech: {
     hardware: 'yes',
@@ -111,8 +164,22 @@ export const EXAMPLE_INTAKE: Intake = {
     manufacturing: 'contract',
     contractManufacturer: 'Example Contract Manufacturing, LLC',
     suppliers: 'Electrode and adhesive supplier, AWS (cloud hosting), ECG annotation vendor',
-    qmsTools: 'Google Workspace, Jira',
+    qmsTools: 'Microsoft 365 (SharePoint), Jira',
     devTools: 'GitHub, GitHub Actions, Jira',
+    equipment: 'ECG patient simulator, adhesion peel tester, torque gauge',
+    labeling: 'eifu',
+    udiAgency: 'GS1',
+  },
+  qms: {
+    docSystem: 'sharepoint',
+    siteUrl: 'https://examplecardio.sharepoint.com/sites/QMS',
+    eSignature: 'docusign',
+    retention: 'lifetime-2',
+    trainingDays: '14',
+    capaTargets: 'standard',
+    auditFrequency: 'annual',
+    reviewFrequency: 'annual',
+    complaintChannels: 'support@examplecardio.com, in-app feedback, pilot site coordinators',
   },
   team: {
     ceo: 'Alex Rivera, CEO',
@@ -126,13 +193,14 @@ export const EXAMPLE_INTAKE: Intake = {
   },
 };
 
-export type StepId = 'company' | 'device' | 'technology' | 'regulatory' | 'operations' | 'team';
+export type StepId = 'company' | 'device' | 'technology' | 'regulatory' | 'operations' | 'quality' | 'team';
 
 export const STEPS: { id: StepId; label: string; blurb: string }[] = [
   { id: 'company', label: 'Company', blurb: 'Who is legally responsible for the device' },
   { id: 'device', label: 'Device', blurb: 'What it is, who uses it and where' },
   { id: 'technology', label: 'Technology', blurb: 'Hardware, software, connectivity and AI' },
   { id: 'regulatory', label: 'Regulatory', blurb: 'Classification and pathway' },
-  { id: 'operations', label: 'Operations', blurb: 'Manufacturing, suppliers and tools' },
+  { id: 'operations', label: 'Operations', blurb: 'Manufacturing, suppliers, labeling and tools' },
+  { id: 'quality', label: 'Quality system', blurb: 'Where records live and how the system runs' },
   { id: 'team', label: 'Team', blurb: 'Who owns, reviews and approves' },
 ];

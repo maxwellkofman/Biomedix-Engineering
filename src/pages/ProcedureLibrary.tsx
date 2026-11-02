@@ -4,6 +4,7 @@ import { Button, ButtonLink } from '../components/Button';
 import { AlertIcon, FileIcon } from '../components/Icon';
 import { AGENT_FOR_PROCEDURE, PROCEDURES, TIERS, reviewOfferFor } from '../data/procedures';
 import { useIntake } from '../intake/IntakeContext';
+import { WordButton } from '../components/WordButton';
 import { docHref } from './Suite';
 import '../styles/app.css';
 
@@ -12,7 +13,7 @@ const DEFAULT_ID = 'SOP-003';
 export default function ProcedureLibrary() {
   const [selectedId, setSelectedId] = useState(DEFAULT_ID);
   const [query, setQuery] = useState('');
-  const { started } = useIntake();
+  const { started, suite } = useIntake();
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -110,7 +111,13 @@ export default function ProcedureLibrary() {
           <ButtonLink to={started ? docHref(doc.id) : '/app/suite'} variant="outline">
             Preview tailored draft
           </ButtonLink>
-          <Button variant="text">Export .docx</Button>
+          {started ? (
+            <WordButton doc={suite.docs.find((x) => x.proc.id === doc.id)!} variant="text" label="Export .docx" />
+          ) : (
+            <ButtonLink to="/app/form" variant="text">
+              Export .docx
+            </ButtonLink>
+          )}
         </div>
 
         <div className="library-grid">

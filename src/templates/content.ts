@@ -72,8 +72,11 @@ export const CONTENT: Record<string, (Body | undefined)[]> = {
     () =>
       'Each gate ends with a design review attended by {{engLead}}, {{qualityLead}} and an individual without direct responsibility for the stage being reviewed.',
     () => 'Essential design outputs are flagged in DHF-T3 and listed in the Medical Device File for {{device}}.',
-    () =>
-      'Verification and validation use protocols approved before testing, with a sample-size rationale under WI-002. Validation is performed with {{users}} in {{environment}}, or a simulation of it.',
+    (c) =>
+      'Verification and validation use protocols approved before testing, with a sample-size rationale under WI-002. Validation is performed with {{users}} in {{environment}}, or a simulation of it.' +
+      (c.d.hasHardware === false
+        ? '\n\nExpected lifetime of each released version: {{lifetime}}.'
+        : '\n\nDevice-specific inputs to verify:\n\n- Patient contact: {{patientContact}}\n- Sterility: {{sterility}}\n- Shelf life: {{shelfLife}}; expected lifetime: {{lifetime}}'),
     () =>
       'Every change is reviewed for its effect on risk, verification, labeling and the marketing authorization. Changes are assessed against {{predicate}} using FDA guidance on deciding when to submit a new 510(k).',
     () => 'One design and development file is kept for {{device}}, indexed in DHF-T1.',
@@ -97,10 +100,43 @@ export const CONTENT: Record<string, (Body | undefined)[]> = {
       'Critical suppliers (direct effect on safety or performance) are qualified by audit or questionnaire and sign a quality agreement before first use. Proposed critical suppliers: {{manufacturer}}; {{suppliers}}.',
   ],
 
+  'SOP-001': [
+    () =>
+      'Applies to every document and record of the {{company}} quality system, paper or electronic. Released documents and records are kept in {{docSystem}}.',
+    () =>
+      'Documents are numbered by type: QM (quality manual), SOP (procedure), WI (work instruction), FRM (form), SPEC (specification), DHF (design and development file) and RMF (risk management file). Revisions are lettered from A.',
+    () =>
+      'Each document is drafted by its author, reviewed by someone other than the author, and approved by the process owner and {{qualityLead}} before release. Approvals are signed using {{eSignature}}.',
+    () =>
+      'Changes are raised on FRM-001 with their effect on product, risk, training and regulatory filings. Training on the change is completed within {{trainingWindow}} of the effective date.',
+    () => 'Standards and regulations used by the quality system are listed in FRM-003 and checked for new editions every 12 months by {{regLead}}.',
+    (c) =>
+      `Electronic records are kept in {{docSystem}}${c.ix.qms.docSystem === 'sharepoint' ? ' at {{siteUrl}}' : ''}. Each record keeps its full version history, and access is limited to named users.` +
+      (c.ix.qms.docSystem === 'sharepoint'
+        ? '\n\nSharePoint configuration:\n\n- One QMS document library with major and minor (draft) versions and required check-out\n- Columns for document ID, revision, status, owner and effective date\n- Released documents are read-only for everyone except the document control group\n- Superseded revisions move to the Obsolete folder and stay retrievable\n- The Microsoft Purview audit log is retained for the record retention period'
+        : '') +
+      '\n\nElectronic signatures are applied with {{eSignature}}. Each signature shows the signer, the date and time, and its meaning (authored, technical review, or approval). {{company}} sends FDA the certification letter required by 21 CFR 11.100(c) before relying on electronic signatures.',
+    () =>
+      'Quality records are kept for {{retention}}. Complaint, servicing and UDI records are included under 21 CFR 820.35.',
+  ],
+
   'SOP-005': [
     () => 'Applies to every employee and contractor of {{company}} performing work that affects {{device}}.',
-    undefined,
+    () =>
+      'New and revised procedures are assigned to the affected roles when released. Training is completed within {{trainingWindow}}; until then, the person does not perform the task alone.',
     roleLines,
+  ],
+
+  'SOP-007': [
+    () => 'Sources: nonconformances, complaints received through {{complaintChannels}}, audit findings, process and product monitoring, and trends.',
+    undefined,
+    undefined,
+    () => 'Target closure times by risk: {{capaTargets}}. Extensions are approved by {{qualityLead}} with a written reason.',
+  ],
+
+  'SOP-011': [
+    () =>
+      'Every quality system process is audited {{auditFrequency}}, weighted by risk and past findings. Auditors do not audit their own work; {{qualityLead}} owns the audit program.',
   ],
 
   'SOP-008': [
@@ -112,20 +148,36 @@ export const CONTENT: Record<string, (Body | undefined)[]> = {
 
   'SOP-010': [() => 'One Medical Device File is kept for {{device}} ({{deviceClass}}, product code {{productCode}}).'],
 
-  'SOP-012': [() => 'Chair: {{ceo}}. Quorum: {{mgmtRep}} and {{qualityLead}}, plus each input owner.'],
+  'SOP-012': [
+    () =>
+      'Management review is held {{reviewFrequency}}. Chair: {{ceo}}. Quorum: {{mgmtRep}} and {{qualityLead}}, plus each input owner.',
+  ],
 
   'SOP-013': [
     () => 'Applies to all labeling for {{device}}, including in-software labeling and the instructions for use.',
-    () => 'Labeling is approved by {{regLead}} and checked against the cleared indications: {{indications}}',
-    () => 'UDI-DIs are assigned per version of {{device}} and entered in GUDID under product code {{productCode}}.',
+    () =>
+      'Labeling for {{device}} is delivered as {{labeling}}. It is approved by {{regLead}} and checked against the cleared indications: {{indications}}',
+    () =>
+      'UDI-DIs are issued through {{udiAgency}}, assigned per version of {{device}}, and entered in GUDID under product code {{productCode}}.',
   ],
 
   'SOP-014': [
     () => 'Applies to every tool that creates or holds quality records: {{qmsTools}}; {{devTools}}.',
-    () => 'Initial inventory: {{qmsTools}}; {{devTools}}. Each entry records the intended use of the features used.',
+    (c) =>
+      'Initial inventory: {{qmsTools}}; {{devTools}}. Each entry records the intended use of the features used.' +
+      (c.ix.qms.docSystem === 'sharepoint'
+        ? '\n\nFor SharePoint, the intended use is storage, versioning and access control of released documents and records. Version history, check-out, permissions and the audit log are the features relied on, and each is tested before go-live.'
+        : ''),
   ],
 
-  'SOP-016': [() => 'Complaints about {{device}} are received from {{users}} through every channel, including pilot sites.'],
+  'SOP-015': [
+    () => 'Equipment that decides product acceptance is listed in FRM-018 with its range, required accuracy and calibration interval. Initial register: {{equipment}}.',
+  ],
+
+  'SOP-016': [
+    () =>
+      'Complaints about {{device}} are received from {{users}} through every channel: {{complaintChannels}}. Anyone at {{company}} who hears of one logs it within 1 business day.',
+  ],
 
   'SOP-018': [
     () =>

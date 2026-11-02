@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import ComingSoon from './pages/ComingSoon';
 import DocumentView from './pages/DocumentView';
+import Publish from './pages/Publish';
+import QuestionForm from './pages/QuestionForm';
 import Setup from './pages/Setup';
 import Suite from './pages/Suite';
 import Home from './pages/Home';
@@ -13,6 +15,8 @@ const TITLES: Record<string, string> = {
   '/app/review': 'Review queue · Biomedix Engineering',
   '/app/procedures': 'Procedure library · Biomedix Engineering',
   '/app/suite': 'Documentation suite · Biomedix Engineering',
+  '/app/form': 'QMS questionnaire · Biomedix Engineering',
+  '/app/publish': 'Publish to SharePoint · Biomedix Engineering',
 };
 
 function useRouteChrome() {
@@ -20,7 +24,7 @@ function useRouteChrome() {
   useEffect(() => {
     document.title =
       TITLES[pathname] ?? (pathname.startsWith('/app/setup') ? 'Setup · Biomedix Engineering' : 'Biomedix Engineering');
-    if (!hash) window.scrollTo(0, 0);
+    if (!hash) window.scrollTo({ top: 0, behavior: 'instant' });
   }, [pathname, hash]);
 }
 
@@ -34,6 +38,8 @@ export default function App() {
       <Route path="/app/procedures" element={<ProcedureLibrary />} />
       <Route path="/app/setup" element={<Navigate to="/app/setup/company" replace />} />
       <Route path="/app/setup/:step" element={<Setup />} />
+      <Route path="/app/form" element={<QuestionForm />} />
+      <Route path="/app/publish" element={<Publish />} />
       <Route path="/app/suite" element={<Suite />} />
       <Route path="/app/suite/:docId" element={<DocumentView />} />
       <Route path="/app/agents" element={<ComingSoon title="Agents" />} />

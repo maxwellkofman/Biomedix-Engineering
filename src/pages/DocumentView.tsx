@@ -6,6 +6,7 @@ import { missingHref, Segments } from '../components/Segments';
 import { useIntake } from '../intake/IntakeContext';
 import { TOKENS } from '../intake/derive';
 import { docToMarkdown, downloadText } from '../templates/generate';
+import { WordButton } from '../components/WordButton';
 import { docHref, StatusPill } from './Suite';
 import '../styles/app.css';
 import '../styles/flow.css';
@@ -190,6 +191,7 @@ export default function DocumentView() {
         <section className="card card--compact">
           <h2 className="card__title card__title--sm">Export</h2>
           <div className="button-row button-row--tight">
+            <WordButton doc={doc} size="sm" variant="primary" />
             <Button
               variant="outline"
               size="sm"
