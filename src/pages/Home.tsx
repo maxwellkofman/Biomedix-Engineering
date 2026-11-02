@@ -395,6 +395,9 @@ export default function Home() {
           <ButtonLink to="#start" variant="primary" size="xl">
             Book a demo and gap scan
           </ButtonLink>
+          <Link to="/app/setup/company" className="cta__alt">
+            Or start drafting your documentation suite now →
+          </Link>
         </div>
       </section>
 

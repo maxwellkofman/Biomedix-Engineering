@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { AppShell } from '../components/AppShell';
-import { Button } from '../components/Button';
+import { Button, ButtonLink } from '../components/Button';
 import { AlertIcon, FileIcon } from '../components/Icon';
 import { AGENT_FOR_PROCEDURE, PROCEDURES, TIERS, reviewOfferFor } from '../data/procedures';
+import { useIntake } from '../intake/IntakeContext';
+import { docHref } from './Suite';
 import '../styles/app.css';
 
 const DEFAULT_ID = 'SOP-003';
@@ -10,6 +12,7 @@ const DEFAULT_ID = 'SOP-003';
 export default function ProcedureLibrary() {
   const [selectedId, setSelectedId] = useState(DEFAULT_ID);
   const [query, setQuery] = useState('');
+  const { started } = useIntake();
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -30,7 +33,7 @@ export default function ProcedureLibrary() {
       project="[Company] · Example SaMD project"
       user={{ initials: 'MK', label: 'Signed-in user', tone: 'muted' }}
     >
-      <aside aria-label="Procedures" className="app-sidebar">
+      <aside aria-label="Procedures" className="app-sidebar app-sidebar--sticky">
         <div className="stack app-sidebar__head app-sidebar__filter">
           <label htmlFor="tpl-filter" className="field-label">
             Filter procedures
@@ -101,8 +104,12 @@ export default function ProcedureLibrary() {
         </div>
 
         <div className="button-row">
-          <Button variant="primary">Run agent on my project</Button>
-          <Button variant="outline">Preview tailored draft</Button>
+          <ButtonLink to={started ? docHref(doc.id) : '/app/setup/company'} variant="primary">
+            Run agent on my project
+          </ButtonLink>
+          <ButtonLink to={started ? docHref(doc.id) : '/app/suite'} variant="outline">
+            Preview tailored draft
+          </ButtonLink>
           <Button variant="text">Export .docx</Button>
         </div>
 

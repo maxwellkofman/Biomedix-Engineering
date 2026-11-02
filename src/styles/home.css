@@ -538,3 +538,8 @@
     padding-bottom: 72px;
   }
 }
+
+.cta__alt {
+  font-weight: 600;
+  text-decoration: none;
+}

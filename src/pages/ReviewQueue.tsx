@@ -1,8 +1,51 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Button } from '../components/Button';
 import { CHECK_LABEL, REVIEW_ITEMS, STEP_FILTERS, STEP_LABEL, type ReviewItem } from '../data/reviewQueue';
+import { AGENT_FOR_PROCEDURE } from '../data/procedures';
+import { useIntake } from '../intake/IntakeContext';
+import { TOKENS, type TokenValues } from '../intake/derive';
+import type { GeneratedDoc } from '../templates/generate';
 import '../styles/app.css';
+
+function ago(iso: string) {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'Just now';
+  if (min < 60) return `${min} min ago`;
+  if (min < 60 * 24) return `${Math.round(min / 60)} h ago`;
+  return `${Math.round(min / 1440)} days ago`;
+}
+
+/** Turn a customer-submitted tailored draft into a queue item. */
+function itemFromDoc(doc: GeneratedDoc, at: string, tokens: TokenValues): ReviewItem {
+  const val = (k: keyof typeof TOKENS) => tokens[k]?.value ?? `[${TOKENS[k].label}]`;
+  const derivedUsed = doc.used.filter((k) => tokens[k]?.auto && !doc.missing.includes(k));
+  return {
+    key: `doc-${doc.proc.id}`,
+    agent: AGENT_FOR_PROCEDURE[doc.proc.id] ?? 'Trace agent',
+    age: ago(at),
+    step: 'review',
+    ref: `${doc.proc.id} · Rev A`,
+    title: `${doc.proc.title}, tailored for ${val('device')}`,
+    summary: `Procedure drafted from ${val('company')}'s setup answers and submitted by the customer. ${doc.filledPct}% of values were filled automatically.`,
+    fields: [
+      ['Document', `${doc.proc.id} ${doc.proc.title}`],
+      ['Device', val('device')],
+      ['Owner', val(doc.ownerToken)],
+      ['Approver', val('mgmtRep')],
+      ['Sections', String(doc.sections.length)],
+      ['Values filled', `${doc.used.length - doc.missing.length} of ${doc.used.length}`],
+    ],
+    reasoning:
+      'Sections follow the Biomedix template for this procedure. Values come from the setup answers; derived values such as safety class and cyber status are proposals the customer has not confirmed.',
+    sources: doc.proc.basis.split(';').map((s) => s.trim()),
+    checks: [
+      ['pass', 'All template sections present'] as ['pass', string],
+      ...doc.missing.map((k) => ['gap', `${TOKENS[k].label} not provided`] as ['gap', string]),
+      ...derivedUsed.slice(0, 3).map((k) => ['note', `${TOKENS[k].label} derived by the agent`] as ['note', string]),
+    ],
+  };
+}
 
 type StepState = 'active' | 'done' | 'waiting' | 'returned';
 
@@ -19,8 +62,16 @@ function signOffPath(item: ReviewItem): { review: [StepState, string]; approval:
 }
 
 export default function ReviewQueue() {
-  const [selectedKey, setSelectedKey] = useState(REVIEW_ITEMS[0].key);
-  const current = REVIEW_ITEMS.find((i) => i.key === selectedKey) ?? REVIEW_ITEMS[0];
+  const { suite, submitted, tokens } = useIntake();
+  const items = useMemo(() => {
+    const fromCustomer = submitted.flatMap((s) => {
+      const doc = suite.docs.find((d) => d.proc.id === s.id);
+      return doc ? [itemFromDoc(doc, s.at, tokens)] : [];
+    });
+    return [...fromCustomer, ...REVIEW_ITEMS];
+  }, [submitted, suite, tokens]);
+  const [selectedKey, setSelectedKey] = useState(items[0].key);
+  const current = items.find((i) => i.key === selectedKey) ?? items[0];
   const path = signOffPath(current);
 
   return (
@@ -28,7 +79,7 @@ export default function ReviewQueue() {
       project="[Company] · ECG patch SaMD"
       user={{ initials: 'BE', label: 'Signed in as a Biomedix reviewer' }}
     >
-      <aside aria-label="Queue" className="app-sidebar app-sidebar--wide">
+      <aside aria-label="Queue" className="app-sidebar app-sidebar--wide app-sidebar--sticky">
         <div className="stack app-sidebar__head">
           <h1 className="app-sidebar__title">Review queue</h1>
           <span className="app-sidebar__sub">Agent outputs waiting on a person</span>
@@ -36,12 +87,12 @@ export default function ReviewQueue() {
         <div role="group" aria-label="Filter by step" className="app-sidebar__pills">
           {STEP_FILTERS.map((f, i) => (
             <span key={f.step} className={`pill${i === 0 ? ' pill--active' : ''}`}>
-              {f.label} · {REVIEW_ITEMS.filter((it) => it.step === f.step).length}
+              {f.label} · {items.filter((it) => it.step === f.step).length}
             </span>
           ))}
         </div>
         <div className="stack queue">
-          {REVIEW_ITEMS.map((item) => {
+          {items.map((item) => {
             const on = item.key === selectedKey;
             return (
               <button
