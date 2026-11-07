@@ -7,13 +7,15 @@ import { useIntake } from '../intake/IntakeContext';
 import { TOKENS } from '../intake/derive';
 import { docToMarkdown, downloadText } from '../templates/generate';
 import { WordButton } from '../components/WordButton';
+import { ProposalList, SignoffPanel } from '../components/SignoffPanel';
+import { StageTag } from '../components/Lifecycle';
 import { docHref, StatusPill } from './Suite';
 import '../styles/app.css';
 import '../styles/flow.css';
 
 export default function DocumentView() {
   const { docId = '' } = useParams();
-  const { suite, tokens, submitted, submitForReview } = useIntake();
+  const { suite, tokens, mode, lives, readiness } = useIntake();
   const doc = suite.docs.find((d) => d.proc.id === docId);
   if (!doc) return <Navigate to="/app/suite" replace />;
 
@@ -21,10 +23,17 @@ export default function DocumentView() {
   const pos = list.indexOf(doc);
   const prev = pos > 0 ? list[pos - 1] : undefined;
   const next = pos >= 0 && pos < list.length - 1 ? list[pos + 1] : undefined;
-  const sent = submitted.some((s) => s.id === doc.proc.id);
+  const life = lives[doc.proc.id];
+  const score = readiness.docs.find((d) => d.doc.proc.id === doc.proc.id);
+  const draftLabel =
+    mode !== 'account' || doc.status === 'na'
+      ? 'AI-generated draft · Rev A'
+      : life?.latest && !life.changed
+        ? `AI-generated · Rev A, draft ${life.latest.draft}`
+        : `AI-generated · Rev A, draft ${(life?.latest?.draft ?? 0) + 1} (not saved)`;
 
   return (
-    <AppShell user={{ initials: 'YOU', label: 'Signed in as the customer', tone: 'muted' }}>
+    <AppShell>
       <aside aria-label="Sections" className="app-sidebar app-sidebar--sticky">
         <Link to="/app/suite" className="back-link">
           ← Documentation suite
@@ -56,7 +65,8 @@ export default function DocumentView() {
           </div>
           <div className="record-head__meta">
             <StatusPill doc={doc} />
-            <span className="record-head__ai">AI-generated draft · Rev A</span>
+            {mode === 'account' && doc.status !== 'na' && <StageTag life={life} />}
+            <span className="record-head__ai">{draftLabel}</span>
           </div>
         </div>
 
@@ -164,29 +174,22 @@ export default function DocumentView() {
           )}
         </section>
 
-        {doc.status !== 'na' && (
-          <section className="card card--night card--compact oversight-panel">
-            <h2 className="card__title card__title--sm">Send for sign-off</h2>
-            <p className="oversight-panel__offer oversight-panel__offer--flush">
-              A Biomedix engineer reviews the draft and signs a technical review. Approval stays with {' '}
-              <Segments segs={[{ kind: 'token', key: 'mgmtRep' }]} />.
-            </p>
-            {sent ? (
-              <ButtonLink to="/app/review" variant="outline-night" size="sm">
-                In technical review · open queue
-              </ButtonLink>
-            ) : (
-              <Button variant="bright" size="sm" onClick={() => submitForReview(doc.proc.id)}>
-                Submit for technical review
-              </Button>
-            )}
-            {doc.missing.length > 0 && !sent && (
-              <span className="oversight-panel__fine">
-                You can submit with gaps; the reviewer will return it with comments.
+        {score && score.derived.length > 0 && (
+          <section className="card card--compact" aria-labelledby="proposals-h">
+            <div className="outline__head">
+              <h2 id="proposals-h" className="card__title card__title--sm">
+                Agent proposals
+              </h2>
+              <span className="text-muted-sm">
+                {score.derived.length - score.unconfirmed.length} of {score.derived.length} confirmed
               </span>
-            )}
+            </div>
+            <p className="text-muted-sm">Values the agent derived from your answers. Confirm each one or change the answer.</p>
+            <ProposalList keys={score.derived} compact />
           </section>
         )}
+
+        {doc.status !== 'na' && <SignoffPanel doc={doc} />}
 
         <section className="card card--compact">
           <h2 className="card__title card__title--sm">Export</h2>

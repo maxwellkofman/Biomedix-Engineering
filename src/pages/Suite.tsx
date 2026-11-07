@@ -1,4 +1,5 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ReadinessRing, StageTag } from '../components/Lifecycle';
 import { AppShell } from '../components/AppShell';
 import { Button, ButtonLink } from '../components/Button';
 import { missingHref, Segments } from '../components/Segments';
@@ -6,14 +7,11 @@ import { TIERS } from '../data/procedures';
 import { useIntake } from '../intake/IntakeContext';
 import { TOKENS } from '../intake/derive';
 import { downloadText, suiteToMarkdown, type GeneratedDoc } from '../templates/generate';
+import { docHref } from '../lib/links';
 import '../styles/app.css';
 import '../styles/flow.css';
 
-const USER = { initials: 'YOU', label: 'Signed in as the customer', tone: 'muted' as const };
-
-export function docHref(id: string) {
-  return `/app/suite/${encodeURIComponent(id)}`;
-}
+export { docHref };
 
 export function StatusPill({ doc }: { doc: GeneratedDoc }) {
   if (doc.status === 'na') return <span className="status status--na">Not applicable</span>;
@@ -22,14 +20,14 @@ export function StatusPill({ doc }: { doc: GeneratedDoc }) {
 }
 
 export default function Suite() {
-  const { suite, tokens, started, submitted, loadExample, intake } = useIntake();
+  const { suite, tokens, started, loadExample, intake, mode, lives, readiness, runs } = useIntake();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const created = params.get('created') === '1';
 
   if (!started) {
     return (
-      <AppShell user={USER}>
+      <AppShell>
         <main className="app-main suite-empty">
           <span className="eyebrow">DOCUMENTATION SUITE</span>
           <h1 className="setup-main__title">Answer a few questions. Get every required procedure, drafted.</h1>
@@ -70,10 +68,11 @@ export default function Suite() {
   }
 
   const company = tokens.company?.value ?? 'your company';
-  const sentIds = new Set(submitted.map((s) => s.id));
+  const runNo = Number(params.get('run'));
+  const run = runNo ? runs.find((r) => r.number === runNo) : undefined;
 
   return (
-    <AppShell user={USER}>
+    <AppShell>
       <main className="app-main suite-main">
         <div className="suite-head">
           <div className="stack suite-head__copy">
@@ -88,6 +87,11 @@ export default function Suite() {
             <ButtonLink to="/app/form" variant="outline">
               Edit answers
             </ButtonLink>
+            {mode === 'account' && (
+              <ButtonLink to="/app/history" variant="outline">
+                History{runs.length ? ` · ${runs.length} run${runs.length > 1 ? 's' : ''}` : ''}
+              </ButtonLink>
+            )}
             <Button
               variant="outline"
               onClick={() =>
@@ -103,15 +107,33 @@ export default function Suite() {
         {created && (
           <div role="status" className="created-banner">
             <div className="stack">
-              <strong>Your documentation is created.</strong>
+              <strong>
+                {run ? `Run ${run.number} saved to your account.` : 'Your documentation is created.'}
+              </strong>
               <span>
-                {suite.applicable.length} procedures drafted, {suite.filledPct}% filled from your answers.{' '}
+                {run
+                  ? [
+                      run.summary.counts.new && `${run.summary.counts.new} new`,
+                      run.summary.counts.revised && `${run.summary.counts.revised} revised with a new draft`,
+                      run.summary.counts.same && `${run.summary.counts.same} unchanged`,
+                      run.summary.counts.dropped && `${run.summary.counts.dropped} no longer required`,
+                    ]
+                      .filter(Boolean)
+                      .join(', ') + '. '
+                  : `${suite.applicable.length} procedures drafted, ${suite.filledPct}% filled from your answers. `}
                 {suite.missing.length
                   ? `${suite.missing.length} answer${suite.missing.length > 1 ? 's' : ''} would fill the rest.`
-                  : 'Nothing left to fill.'}
+                  : 'Nothing left to fill.'}{' '}
+                Readiness is {readiness.pct}%.
+                {mode === 'guest' && ' Answers are saved in this browser only.'}
               </span>
             </div>
             <div className="button-row">
+              {mode === 'guest' && (
+                <ButtonLink to="/sign-up?next=/app/suite" variant="primary">
+                  Save to an account
+                </ButtonLink>
+              )}
               <ButtonLink to="/app/publish" variant={intake.qms.docSystem === 'sharepoint' ? 'primary' : 'outline'}>
                 {intake.qms.docSystem === 'sharepoint' ? 'Set up SharePoint →' : 'Download or publish →'}
               </ButtonLink>
@@ -124,6 +146,7 @@ export default function Suite() {
 
         <div className="facts suite-stats">
           {[
+            ['Compliance readiness', `${readiness.pct}%`],
             ['Required procedures', String(suite.applicable.length)],
             ['Auto-filled', `${suite.filledPct}%`],
             ['Ready for review', String(suite.ready)],
@@ -175,7 +198,7 @@ export default function Suite() {
                                 <span className="meter__fill" style={{ width: `${doc.filledPct}%` }} />
                               </span>
                             )}
-                            {sentIds.has(doc.proc.id) && <span className="doc-row__sent">In technical review</span>}
+                            {mode === 'account' && doc.status !== 'na' && <StageTag life={lives[doc.proc.id]} />}
                           </span>
                         </Link>
                       </li>
@@ -187,6 +210,17 @@ export default function Suite() {
           </div>
 
           <div className="stack suite-side">
+            <Link to="/app/readiness" className="card card--compact readiness-mini">
+              <ReadinessRing pct={readiness.pct} size={88} />
+              <span className="stack">
+                <span className="card__title card__title--sm">Compliance readiness</span>
+                <span className="text-muted-sm">
+                  {readiness.counts.approved} of {suite.applicable.length} procedures approved ·{' '}
+                  {readiness.requirementsMet} of {readiness.requirementsTotal} requirements met
+                </span>
+                <span className="mode-card__go">See what's left →</span>
+              </span>
+            </Link>
             <section aria-labelledby="missing-h" className="card card--compact">
               <h2 id="missing-h" className="card__title card__title--sm">
                 What's still missing

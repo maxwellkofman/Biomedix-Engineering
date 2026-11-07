@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAccount } from '../account/AccountContext';
 import { AppShell } from '../components/AppShell';
-import { Button } from '../components/Button';
-import { CHECK_LABEL, REVIEW_ITEMS, STEP_FILTERS, STEP_LABEL, type ReviewItem } from '../data/reviewQueue';
+import { Button, ButtonLink } from '../components/Button';
+import { CHECK_LABEL, REVIEW_ITEMS, STEP_FILTERS, STEP_LABEL, type ReviewItem, type ReviewStep } from '../data/reviewQueue';
 import { AGENT_FOR_PROCEDURE } from '../data/procedures';
+import type { DocReadiness } from '../compliance/readiness';
 import { useIntake } from '../intake/IntakeContext';
 import { TOKENS, type TokenValues } from '../intake/derive';
-import type { GeneratedDoc } from '../templates/generate';
+import { docHref } from '../lib/links';
 import '../styles/app.css';
 
 function ago(iso: string) {
@@ -16,84 +19,144 @@ function ago(iso: string) {
   return `${Math.round(min / 1440)} days ago`;
 }
 
-/** Turn a customer-submitted tailored draft into a queue item. */
-function itemFromDoc(doc: GeneratedDoc, at: string, tokens: TokenValues): ReviewItem {
+interface QueueItem extends ReviewItem {
+  /** Set for the customer's own saved drafts; unset for the example items. */
+  docId?: string;
+  draft?: number;
+  reviewer?: string;
+  returnNote?: string;
+}
+
+const STEP_FOR_STAGE: Partial<Record<string, ReviewStep>> = {
+  submitted: 'review',
+  reviewed: 'approval',
+  returned: 'returned',
+};
+
+/** Turn a submitted draft into a queue item. */
+function itemFromDoc(d: DocReadiness, tokens: TokenValues): QueueItem | null {
+  const { doc, life } = d;
+  const step = STEP_FOR_STAGE[life.stage];
+  if (!life.latest || !step) return null;
   const val = (k: keyof typeof TOKENS) => tokens[k]?.value ?? `[${TOKENS[k].label}]`;
-  const derivedUsed = doc.used.filter((k) => tokens[k]?.auto && !doc.missing.includes(k));
+  const derivedUsed = d.unconfirmed;
+  const last = life.history[life.history.length - 1];
   return {
     key: `doc-${doc.proc.id}`,
+    docId: doc.proc.id,
+    draft: life.latest.draft,
+    reviewer: life.review?.signer,
+    returnNote: life.returned?.note,
     agent: AGENT_FOR_PROCEDURE[doc.proc.id] ?? 'Trace agent',
-    age: ago(at),
-    step: 'review',
-    ref: `${doc.proc.id} · Rev A`,
+    age: ago(last.createdAt),
+    step,
+    ref: `${doc.proc.id} · Rev A, draft ${life.latest.draft}`,
     title: `${doc.proc.title}, tailored for ${val('device')}`,
-    summary: `Procedure drafted from ${val('company')}'s setup answers and submitted by the customer. ${doc.filledPct}% of values were filled automatically.`,
+    summary: `Procedure drafted from ${val('company')}'s setup answers and submitted by the customer. ${life.latest.filledPct}% of values were filled automatically.`,
     fields: [
       ['Document', `${doc.proc.id} ${doc.proc.title}`],
       ['Device', val('device')],
+      ['Draft', `${life.latest.draft}, saved in run ${life.latest.runNumber}`],
       ['Owner', val(doc.ownerToken)],
       ['Approver', val('mgmtRep')],
       ['Sections', String(doc.sections.length)],
       ['Values filled', `${doc.used.length - doc.missing.length} of ${doc.used.length}`],
     ],
     reasoning:
-      'Sections follow the Biomedix template for this procedure. Values come from the setup answers; derived values such as safety class and cyber status are proposals the customer has not confirmed.',
+      'Sections follow the Biomedix template for this procedure. Values come from the setup answers; derived values such as safety class and cyber status are proposals until the customer confirms them.',
     sources: doc.proc.basis.split(';').map((s) => s.trim()),
     checks: [
       ['pass', 'All template sections present'] as ['pass', string],
+      ...(life.changed ? [['note', 'Customer has changed answers since this draft'] as ['note', string]] : []),
       ...doc.missing.map((k) => ['gap', `${TOKENS[k].label} not provided`] as ['gap', string]),
-      ...derivedUsed.slice(0, 3).map((k) => ['note', `${TOKENS[k].label} derived by the agent`] as ['note', string]),
+      ...derivedUsed.slice(0, 3).map((k) => ['note', `${TOKENS[k].label} derived by the agent, not confirmed`] as ['note', string]),
     ],
   };
 }
 
 type StepState = 'active' | 'done' | 'waiting' | 'returned';
 
-function signOffPath(item: ReviewItem): { review: [StepState, string]; approval: [StepState, string] } {
+function signOffPath(item: QueueItem, company: string): { review: [StepState, string]; approval: [StepState, string] } {
   const review: [StepState, string] =
     item.step === 'review'
       ? ['active', 'In your queue']
       : item.step === 'returned'
         ? ['returned', 'Returned with comments']
-        : ['done', 'Signed · [Reviewer name]'];
+        : ['done', `Signed · ${item.reviewer ?? '[Reviewer name]'}`];
   const approval: [StepState, string] =
-    item.step === 'approval' ? ['active', 'Waiting on [approver]'] : ['waiting', 'Locked until review is signed'];
+    item.step === 'approval'
+      ? ['active', `Waiting on ${item.docId ? company : '[approver]'}`]
+      : ['waiting', 'Locked until review is signed'];
   return { review, approval };
 }
 
 export default function ReviewQueue() {
-  const { suite, submitted, tokens } = useIntake();
-  const items = useMemo(() => {
-    const fromCustomer = submitted.flatMap((s) => {
-      const doc = suite.docs.find((d) => d.proc.id === s.id);
-      return doc ? [itemFromDoc(doc, s.at, tokens)] : [];
+  const { user } = useAccount();
+  const { readiness, tokens, mode, signoff } = useIntake();
+  const items = useMemo<QueueItem[]>(() => {
+    if (mode === 'guest') return REVIEW_ITEMS;
+    return readiness.docs.flatMap((d) => {
+      const it = itemFromDoc(d, tokens);
+      return it ? [it] : [];
     });
-    return [...fromCustomer, ...REVIEW_ITEMS];
-  }, [submitted, suite, tokens]);
-  const [selectedKey, setSelectedKey] = useState(items[0].key);
-  const current = items.find((i) => i.key === selectedKey) ?? items[0];
-  const path = signOffPath(current);
+  }, [mode, readiness, tokens]);
+  const [filter, setFilter] = useState<ReviewStep>('review');
+  const shown = items.filter((i) => i.step === filter);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const current = shown.find((i) => i.key === selectedKey) ?? shown[0];
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const company = tokens.company?.value ?? '[Company]';
+
+  useEffect(() => {
+    setNote('');
+    setError(null);
+  }, [current?.key]);
+
+  const act = async (kind: 'review' | 'return') => {
+    if (!current?.docId) return;
+    if (kind === 'return' && !note.trim()) {
+      setError('Say what needs to change before returning it.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await signoff(current.docId, kind, { note: note.trim() });
+      setNote('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not record the sign-off.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const path = current ? signOffPath(current, company) : null;
 
   return (
-    <AppShell
-      project="[Company] · ECG patch SaMD"
-      user={{ initials: 'BE', label: 'Signed in as a Biomedix reviewer' }}
-    >
+    <AppShell>
       <aside aria-label="Queue" className="app-sidebar app-sidebar--wide app-sidebar--sticky">
         <div className="stack app-sidebar__head">
           <h1 className="app-sidebar__title">Review queue</h1>
           <span className="app-sidebar__sub">Agent outputs waiting on a person</span>
         </div>
         <div role="group" aria-label="Filter by step" className="app-sidebar__pills">
-          {STEP_FILTERS.map((f, i) => (
-            <span key={f.step} className={`pill${i === 0 ? ' pill--active' : ''}`}>
+          {STEP_FILTERS.map((f) => (
+            <button
+              key={f.step}
+              type="button"
+              aria-pressed={filter === f.step}
+              onClick={() => setFilter(f.step)}
+              className={`pill${filter === f.step ? ' pill--active' : ''}`}
+            >
               {f.label} · {items.filter((it) => it.step === f.step).length}
-            </span>
+            </button>
           ))}
         </div>
         <div className="stack queue">
-          {items.map((item) => {
-            const on = item.key === selectedKey;
+          {shown.map((item) => {
+            const on = item.key === current?.key;
             return (
               <button
                 key={item.key}
@@ -111,9 +174,35 @@ export default function ReviewQueue() {
               </button>
             );
           })}
+          {!shown.length && <p className="text-muted-sm queue-empty">Nothing here.</p>}
         </div>
+        {mode === 'guest' && (
+          <p className="text-muted-sm">
+            Example items. <Link to="/sign-up?next=/app/review">Create an account</Link> to send your own documents for
+            review.
+          </p>
+        )}
       </aside>
 
+      {!current || !path ? (
+        <main className="app-main queue-empty-main">
+          <span className="eyebrow">REVIEW QUEUE</span>
+          <h2 className="setup-main__title">
+            {items.length ? 'Nothing in this list.' : 'No documents waiting on review.'}
+          </h2>
+          <p className="setup-main__blurb">
+            {items.length
+              ? 'Pick another list on the left.'
+              : 'Documents you submit for technical review show up here. Complete drafts are ready to send from the readiness page.'}
+          </p>
+          <div className="button-row">
+            <ButtonLink to="/app/readiness">Open readiness</ButtonLink>
+            <ButtonLink to="/app/suite" variant="outline">
+              Documentation suite
+            </ButtonLink>
+          </div>
+        </main>
+      ) : (
       <main className="app-main">
         <ol aria-label="Sign-off path" className="list-reset signoff">
           <li className="signoff__step signoff__step--done">
@@ -125,7 +214,7 @@ export default function ReviewQueue() {
             <span className="signoff__status">{path.review[1]}</span>
           </li>
           <li className={`signoff__step signoff__step--${path.approval[0]}`}>
-            <span className="signoff__label">3 · [COMPANY] APPROVAL</span>
+            <span className="signoff__label">3 · {current.docId ? company.toUpperCase() : '[COMPANY]'} APPROVAL</span>
             <span className="signoff__status">{path.approval[1]}</span>
           </li>
         </ol>
@@ -133,10 +222,15 @@ export default function ReviewQueue() {
         <div className="stack record-head">
           <div className="record-head__meta">
             <span className="mono record-head__ref">{current.ref}</span>
-            <span className="record-head__ai">AI-generated · model [version]</span>
+            <span className="record-head__ai">{current.docId ? 'AI-generated from setup answers' : 'AI-generated · model [version]'}</span>
           </div>
           <h2 className="record-head__title">{current.title}</h2>
           <p className="record-head__summary">{current.summary}</p>
+          {current.docId && (
+            <Link to={docHref(current.docId)} className="record-head__open">
+              Open the full document →
+            </Link>
+          )}
         </div>
 
         <div className="review-grid">
@@ -178,28 +272,82 @@ export default function ReviewQueue() {
           </div>
         </div>
 
-        <section aria-labelledby="sign-h" className="card card--night sign-panel">
-          <h3 id="sign-h" className="sign-panel__title">Your review</h3>
-          <label htmlFor="review-note" className="sign-panel__label">
-            Comments for the agent and the approver
-          </label>
-          <textarea
-            id="review-note"
-            rows={3}
-            placeholder="What you checked, what you changed, what the approver should know"
-            className="sign-panel__input"
-          />
-          <p className="sign-panel__note">
-            Signing records a Part 11 e-signature with the meaning <strong>Technical review</strong>. It does not approve
-            the record; approval stays with [Company].
-          </p>
-          <div className="button-row">
-            <Button variant="bright">Sign technical review</Button>
-            <Button variant="outline-night">Return to agent with comments</Button>
-            <Button variant="text-night">Edit draft</Button>
-          </div>
-        </section>
+        {!current.docId ? (
+          <section aria-labelledby="sign-h" className="card card--night sign-panel">
+            <h3 id="sign-h" className="sign-panel__title">Your review</h3>
+            <label htmlFor="review-note" className="sign-panel__label">
+              Comments for the agent and the approver
+            </label>
+            <textarea
+              id="review-note"
+              rows={3}
+              placeholder="What you checked, what you changed, what the approver should know"
+              className="sign-panel__input"
+            />
+            <p className="sign-panel__note">
+              Signing records a Part 11 e-signature with the meaning <strong>Technical review</strong>. It does not
+              approve the record; approval stays with [Company].
+            </p>
+            <div className="button-row">
+              <Button variant="bright">Sign technical review</Button>
+              <Button variant="outline-night">Return to agent with comments</Button>
+              <Button variant="text-night">Edit draft</Button>
+            </div>
+          </section>
+        ) : current.step === 'review' ? (
+          <section aria-labelledby="sign-h" className="card card--night sign-panel">
+            <h3 id="sign-h" className="sign-panel__title">Your review of draft {current.draft}</h3>
+            <label htmlFor="review-note" className="sign-panel__label">
+              Comments for the customer and the approver
+            </label>
+            <textarea
+              id="review-note"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="What you checked, what needs to change, what the approver should know"
+              className="sign-panel__input"
+            />
+            <p className="sign-panel__note">
+              Signing records {user?.name ?? 'your name'}, the time and the draft number with the meaning{' '}
+              <strong>Technical review</strong>. It does not approve the record; approval stays with {company}.
+            </p>
+            {error && (
+              <p role="alert" className="oversight-panel__error">
+                {error}
+              </p>
+            )}
+            <div className="button-row">
+              <Button variant="bright" disabled={busy} onClick={() => void act('review')}>
+                Sign technical review
+              </Button>
+              <Button variant="outline-night" disabled={busy} onClick={() => void act('return')}>
+                Return with comments
+              </Button>
+            </div>
+            <p className="sign-panel__fine">
+              Reviewing as {user?.name}. In production, Biomedix engineers sign from their own reviewer accounts.
+            </p>
+          </section>
+        ) : (
+          <section aria-labelledby="sign-h" className="card card--night sign-panel">
+            <h3 id="sign-h" className="sign-panel__title">
+              {current.step === 'approval' ? `Waiting on ${company} approval` : 'Returned with comments'}
+            </h3>
+            <p className="sign-panel__note">
+              {current.step === 'approval'
+                ? `Technical review signed by ${current.reviewer}. The approver records approval on the document.`
+                : current.returnNote}
+            </p>
+            <div className="button-row">
+              <ButtonLink to={docHref(current.docId)} variant="bright">
+                {current.step === 'approval' ? 'Record approval' : 'Open the document'}
+              </ButtonLink>
+            </div>
+          </section>
+        )}
       </main>
+      )}
     </AppShell>
   );
 }

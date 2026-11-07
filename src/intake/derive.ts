@@ -112,6 +112,8 @@ export interface TokenValue {
   value: string;
   /** True when the value was derived or defaulted rather than typed by the customer. */
   auto: boolean;
+  /** A derived value the customer has confirmed (see IntakeContext). */
+  confirmed?: boolean;
 }
 
 export type TokenValues = Partial<Record<TokenKey, TokenValue>>;

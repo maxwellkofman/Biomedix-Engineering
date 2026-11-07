@@ -30,10 +30,7 @@ export default function ProcedureLibrary() {
   const runsWith = doc.planned ? 'Planned' : (AGENT_FOR_PROCEDURE[doc.id] ?? 'Trace agent');
 
   return (
-    <AppShell
-      project="[Company] · Example SaMD project"
-      user={{ initials: 'MK', label: 'Signed-in user', tone: 'muted' }}
-    >
+    <AppShell>
       <aside aria-label="Procedures" className="app-sidebar app-sidebar--sticky">
         <div className="stack app-sidebar__head app-sidebar__filter">
           <label htmlFor="tpl-filter" className="field-label">

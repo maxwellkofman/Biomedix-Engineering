@@ -7,10 +7,9 @@ import { SuitePreview } from '../components/SuitePreview';
 import { useIntake } from '../intake/IntakeContext';
 import { STEPS } from '../intake/model';
 import { GROUPS, progress } from '../intake/questions';
+import { useCreateDocs } from '../intake/useCreateDocs';
 import '../styles/app.css';
 import '../styles/flow.css';
-
-export const CUSTOMER = { initials: 'YOU', label: 'Signed in as the customer', tone: 'muted' as const };
 
 /** Scroll to and focus the field named in the URL hash (used by "needs input" links). */
 export function useFocusFromHash(dep: unknown) {
@@ -47,6 +46,7 @@ export function ResetButton({ to }: { to: string }) {
 export default function Setup() {
   const { step } = useParams();
   const { intake, derived, tokens, loadExample } = useIntake();
+  const { create, busy, error } = useCreateDocs();
   useFocusFromHash(step);
 
   const index = STEPS.findIndex((s) => s.id === step);
@@ -57,7 +57,7 @@ export default function Setup() {
   const ctx = { ix: intake, d: derived, tokens };
 
   return (
-    <AppShell user={CUSTOMER}>
+    <AppShell>
       <aside aria-label="Setup steps" className="app-sidebar app-sidebar--sticky">
         <div className="stack app-sidebar__head">
           <h1 className="app-sidebar__title">Set up your QMS</h1>
@@ -125,11 +125,16 @@ export default function Setup() {
               Next: {next.label} →
             </ButtonLink>
           ) : (
-            <ButtonLink to="/app/suite?created=1" variant="primary">
-              Create documentation suite →
-            </ButtonLink>
+            <Button variant="primary" onClick={() => void create()} disabled={busy}>
+              {busy ? 'Saving run…' : 'Create documentation suite →'}
+            </Button>
           )}
         </div>
+        {error && (
+          <p role="alert" className="notice notice--warn">
+            {error}
+          </p>
+        )}
       </main>
 
       <SuitePreview />

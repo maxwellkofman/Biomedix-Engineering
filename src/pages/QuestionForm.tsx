@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button } from '../components/Button';
 import { QuestionGroupCard } from '../components/Questions';
@@ -6,21 +6,21 @@ import { SuitePreview } from '../components/SuitePreview';
 import { useIntake } from '../intake/IntakeContext';
 import { STEPS } from '../intake/model';
 import { GROUPS, progress } from '../intake/questions';
-import { CUSTOMER, ResetButton, useFocusFromHash } from './Setup';
+import { useCreateDocs } from '../intake/useCreateDocs';
+import { ResetButton, useFocusFromHash } from './Setup';
 import '../styles/app.css';
 import '../styles/flow.css';
 
 /** All questions on one page. Answer what you can, then create the documentation. */
 export default function QuestionForm() {
-  const { intake, derived, tokens, suite, loadExample } = useIntake();
-  const navigate = useNavigate();
+  const { intake, derived, tokens, suite, loadExample, mode, runs } = useIntake();
+  const { create, busy, error } = useCreateDocs();
   useFocusFromHash('form');
   const ctx = { ix: intake, d: derived, tokens };
   const all = progress(ctx);
-  const create = () => navigate('/app/suite?created=1');
 
   return (
-    <AppShell user={CUSTOMER}>
+    <AppShell>
       <aside aria-label="Form sections" className="app-sidebar app-sidebar--sticky">
         <div className="stack app-sidebar__head">
           <h1 className="app-sidebar__title">QMS questionnaire</h1>
@@ -76,7 +76,7 @@ export default function QuestionForm() {
           className="stack setup-form"
           onSubmit={(e) => {
             e.preventDefault();
-            create();
+            void create();
           }}
         >
           {STEPS.map((s, i) => (
@@ -100,19 +100,26 @@ export default function QuestionForm() {
               <p className="create-panel__text">
                 {suite.applicable.length} procedures will be drafted for your device, {suite.filledPct}% filled from your
                 answers. {suite.notApplicable > 0 && `${suite.notApplicable} don't apply and are justified in the quality manual. `}
-                You can come back and change answers at any time.
+                {mode === 'account'
+                  ? `Saved to your account as run ${(runs[0]?.number ?? 0) + 1}. Change answers any time and create again: documents that change get a new draft.`
+                  : 'You can come back and change answers at any time.'}
               </p>
+              {error && (
+                <p role="alert" className="create-panel__error">
+                  {error}
+                </p>
+              )}
             </div>
-            <Button type="submit" variant="bright" size="lg">
-              Create documentation →
+            <Button type="submit" variant="bright" size="lg" disabled={busy}>
+              {busy ? 'Saving run…' : 'Create documentation →'}
             </Button>
           </section>
         </form>
       </main>
 
       <SuitePreview>
-        <Button size="sm" onClick={create}>
-          Create documentation
+        <Button size="sm" onClick={() => void create()} disabled={busy}>
+          {busy ? 'Saving run…' : 'Create documentation'}
         </Button>
       </SuitePreview>
     </AppShell>

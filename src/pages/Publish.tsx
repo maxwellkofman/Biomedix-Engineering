@@ -17,7 +17,6 @@ import {
   type Session,
 } from '../export/sharepoint';
 import { buildTree, countTree, type QmsFolder } from '../export/structure';
-import { CUSTOMER } from './Setup';
 import '../styles/app.css';
 import '../styles/flow.css';
 
@@ -131,7 +130,7 @@ export default function Publish() {
 
   if (!started) {
     return (
-      <AppShell user={CUSTOMER}>
+      <AppShell>
         <main className="app-main suite-empty">
           <span className="eyebrow">PUBLISH TO SHAREPOINT</span>
           <h1 className="setup-main__title">Answer the questionnaire first</h1>
@@ -147,7 +146,7 @@ export default function Publish() {
   }
 
   return (
-    <AppShell user={CUSTOMER}>
+    <AppShell>
       <main className="app-main suite-main">
         <div className="suite-head">
           <div className="stack suite-head__copy">

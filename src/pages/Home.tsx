@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ButtonLink } from '../components/Button';
 import { CheckIcon, Icon, type IconName } from '../components/Icon';
 import { Logo } from '../components/Logo';
+import { useAccount } from '../account/AccountContext';
 import '../styles/home.css';
 
 const SITE_NAV = [
@@ -126,6 +127,7 @@ const ONBOARDING = [
 ];
 
 export default function Home() {
+  const { status } = useAccount();
   return (
     <div id="top" className="home">
       <header className="night">
@@ -137,6 +139,9 @@ export default function Home() {
                 {item.label}
               </a>
             ))}
+            <Link to={status === 'signed-in' ? '/app/projects' : '/sign-in'} className="site-nav__link">
+              {status === 'signed-in' ? 'Your projects' : 'Sign in'}
+            </Link>
             <ButtonLink to="#start" variant="bright">
               Book a demo
             </ButtonLink>
