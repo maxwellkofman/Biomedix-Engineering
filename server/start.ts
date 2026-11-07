@@ -2,6 +2,8 @@
  * Production server: the built site from dist/ plus the account API.
  *   npm run build && npm start
  * PORT (default 3000), HOST (default 0.0.0.0) and BIOMEDIX_DATA_DIR (default ./data).
+ * Set BIOMEDIX_APP_URL (the public https:// address) and BIOMEDIX_MAIL_WEBHOOK so
+ * verification, reset and invitation emails go out. See README → Accounts.
  */
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -32,7 +34,7 @@ function fileFor(pathname: string): string | null {
   }
 }
 
-const api = apiMiddleware();
+const api = apiMiddleware({ dev: process.env.BIOMEDIX_DEV === '1' });
 
 const server = createServer((req, res) => {
   api(req, res, () => {

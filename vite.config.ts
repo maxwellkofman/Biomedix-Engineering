@@ -8,10 +8,11 @@ function accountApi(): Plugin {
   return {
     name: 'biomedix-account-api',
     configureServer(server) {
-      server.middlewares.use(apiMiddleware());
+      // Dev mode: emails go to the mailbox at /dev/mail instead of being sent.
+      server.middlewares.use(apiMiddleware({ dev: process.env.BIOMEDIX_DEV !== '0' }));
     },
     configurePreviewServer(server) {
-      server.middlewares.use(apiMiddleware());
+      server.middlewares.use(apiMiddleware({ dev: process.env.BIOMEDIX_DEV === '1' }));
     },
   };
 }

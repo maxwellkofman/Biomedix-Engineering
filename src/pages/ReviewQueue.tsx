@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from '../account/AccountContext';
 import { AppShell } from '../components/AppShell';
@@ -79,7 +79,7 @@ type StepState = 'active' | 'done' | 'waiting' | 'returned';
 function signOffPath(item: QueueItem, company: string): { review: [StepState, string]; approval: [StepState, string] } {
   const review: [StepState, string] =
     item.step === 'review'
-      ? ['active', 'In your queue']
+      ? ['active', item.docId ? 'With a Biomedix engineer' : 'In your queue']
       : item.step === 'returned'
         ? ['returned', 'Returned with comments']
         : ['done', `Signed · ${item.reviewer ?? '[Reviewer name]'}`];
@@ -92,7 +92,7 @@ function signOffPath(item: QueueItem, company: string): { review: [StepState, st
 
 export default function ReviewQueue() {
   const { user } = useAccount();
-  const { readiness, tokens, mode, signoff } = useIntake();
+  const { readiness, tokens, mode, canApprove, approvers, projectId } = useIntake();
   const items = useMemo<QueueItem[]>(() => {
     if (mode === 'guest') return REVIEW_ITEMS;
     return readiness.docs.flatMap((d) => {
@@ -104,33 +104,7 @@ export default function ReviewQueue() {
   const shown = items.filter((i) => i.step === filter);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const current = shown.find((i) => i.key === selectedKey) ?? shown[0];
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const company = tokens.company?.value ?? '[Company]';
-
-  useEffect(() => {
-    setNote('');
-    setError(null);
-  }, [current?.key]);
-
-  const act = async (kind: 'review' | 'return') => {
-    if (!current?.docId) return;
-    if (kind === 'return' && !note.trim()) {
-      setError('Say what needs to change before returning it.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await signoff(current.docId, kind, { note: note.trim() });
-      setNote('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not record the sign-off.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const path = current ? signOffPath(current, company) : null;
 
@@ -296,38 +270,20 @@ export default function ReviewQueue() {
           </section>
         ) : current.step === 'review' ? (
           <section aria-labelledby="sign-h" className="card card--night sign-panel">
-            <h3 id="sign-h" className="sign-panel__title">Your review of draft {current.draft}</h3>
-            <label htmlFor="review-note" className="sign-panel__label">
-              Comments for the customer and the approver
-            </label>
-            <textarea
-              id="review-note"
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="What you checked, what needs to change, what the approver should know"
-              className="sign-panel__input"
-            />
+            <h3 id="sign-h" className="sign-panel__title">
+              With Biomedix technical review
+            </h3>
             <p className="sign-panel__note">
-              Signing records {user?.name ?? 'your name'}, the time and the draft number with the meaning{' '}
-              <strong>Technical review</strong>. It does not approve the record; approval stays with {company}.
+              Draft {current.draft} was submitted {current.age.toLowerCase()}. A Biomedix engineer reads it, signs the technical review
+              or returns it with comments. Nothing for you to do until then.
             </p>
-            {error && (
-              <p role="alert" className="oversight-panel__error">
-                {error}
-              </p>
+            {user?.staffRole && (
+              <div className="button-row">
+                <ButtonLink to={`/staff/reviews?doc=${encodeURIComponent(`${projectId}:${current.docId}`)}`} variant="bright">
+                  Open in the reviewer workspace
+                </ButtonLink>
+              </div>
             )}
-            <div className="button-row">
-              <Button variant="bright" disabled={busy} onClick={() => void act('review')}>
-                Sign technical review
-              </Button>
-              <Button variant="outline-night" disabled={busy} onClick={() => void act('return')}>
-                Return with comments
-              </Button>
-            </div>
-            <p className="sign-panel__fine">
-              Reviewing as {user?.name}. In production, Biomedix engineers sign from their own reviewer accounts.
-            </p>
           </section>
         ) : (
           <section aria-labelledby="sign-h" className="card card--night sign-panel">
@@ -336,12 +292,14 @@ export default function ReviewQueue() {
             </h3>
             <p className="sign-panel__note">
               {current.step === 'approval'
-                ? `Technical review signed by ${current.reviewer}. The approver records approval on the document.`
+                ? canApprove
+                  ? `Technical review signed by ${current.reviewer}. Read the document, then approve it with your password.`
+                  : `Technical review signed by ${current.reviewer}. Waiting on ${approvers.length ? approvers.join(', ') : 'an approver'}.`
                 : current.returnNote}
             </p>
             <div className="button-row">
               <ButtonLink to={docHref(current.docId)} variant="bright">
-                {current.step === 'approval' ? 'Record approval' : 'Open the document'}
+                {current.step === 'approval' ? (canApprove ? 'Review and approve' : 'Open the document') : 'Open the document'}
               </ButtonLink>
             </div>
           </section>

@@ -139,8 +139,8 @@ export default function Home() {
                 {item.label}
               </a>
             ))}
-            <Link to={status === 'signed-in' ? '/app/projects' : '/sign-in'} className="site-nav__link">
-              {status === 'signed-in' ? 'Your projects' : 'Sign in'}
+            <Link to={status === 'signed-in' ? '/app/dashboard' : '/sign-in'} className="site-nav__link">
+              {status === 'signed-in' ? 'Dashboard' : 'Sign in'}
             </Link>
             <ButtonLink to="#start" variant="bright">
               Book a demo

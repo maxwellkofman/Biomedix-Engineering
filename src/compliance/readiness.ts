@@ -142,7 +142,16 @@ export function computeReadiness(
   suite: Suite,
   tokens: TokenValues,
   lives: Record<string, DocLifecycle>,
-  opts: { signedIn: boolean; docHref: (id: string) => string; missingHref: (k: TokenKey) => string },
+  opts: {
+    signedIn: boolean;
+    docHref: (id: string) => string;
+    missingHref: (k: TokenKey) => string;
+    /** Signed-in role allows editing (defaults to true). */
+    canEdit?: boolean;
+    /** Signed-in user is one of the company's approvers. */
+    canApprove?: boolean;
+    approvers?: string[];
+  },
 ): Readiness {
   const docs = suite.applicable.map((d) => scoreDoc(d, tokens, lives[d.proc.id]));
   const n = docs.length;
@@ -229,33 +238,42 @@ export function computeReadiness(
       detail: 'Saved drafts can go to technical review and approval',
       to: '/sign-up?next=/app/readiness',
     });
-  else if (changed.length)
+  else if (changed.length && opts.canEdit !== false)
     next.push({
       key: 'save',
       title: 'Save a new run',
       detail: `${plural(changed.length, 'document')} changed since the last saved draft`,
       run: 'save-run',
     });
-  if (opts.signedIn && returned.length)
+  if (opts.signedIn && returned.length && opts.canEdit !== false)
     next.push({
       key: 'returned',
       title: `Address comments on ${plural(returned.length, 'document')}`,
       detail: 'The reviewer returned them; revise your answers and save a new run',
       to: opts.docHref(returned[0].doc.proc.id),
     });
-  if (opts.signedIn && readyToSubmit.length)
+  if (opts.signedIn && readyToSubmit.length && opts.canEdit !== false)
     next.push({
       key: 'submit',
       title: `Send ${plural(readyToSubmit.length, 'document')} for technical review`,
       detail: 'Complete drafts with every value filled and confirmed',
       run: 'submit-ready',
     });
-  if (awaitingApproval.length)
+  if (awaitingApproval.length && (!opts.signedIn || opts.canApprove))
     next.push({
       key: 'approve',
       title: `Record approval for ${plural(awaitingApproval.length, 'document')}`,
       detail: 'Technical review is signed; approval stays with your company',
       to: opts.docHref(awaitingApproval[0].doc.proc.id),
+    });
+  else if (awaitingApproval.length)
+    next.push({
+      key: 'approve',
+      title: `${plural(awaitingApproval.length, 'document')} waiting on approval`,
+      detail: opts.approvers?.length
+        ? `Approvers in your company: ${opts.approvers.join(', ')}`
+        : 'Nobody in your company is an approver yet. An owner or admin can name one in Members.',
+      to: opts.approvers?.length ? '/app/review' : '/app/settings/members',
     });
   if (inReview.length)
     next.push({

@@ -18,7 +18,27 @@ npm run build
 npm start
 ```
 
-`npm start` serves the built site and the API on `PORT` (default 3000). Data is stored in SQLite at `BIOMEDIX_DATA_DIR` (default `./data`); back up that folder. A static host (Netlify, Vercel static) can serve the app without the API: everything works except accounts, and answers stay in the browser.
+`npm start` serves the built site and the API on `PORT` (default 3000). Data is stored in SQLite at `BIOMEDIX_DATA_DIR` (default `./data`); back up that folder, including `secret.key`, which encrypts two-factor secrets. A static host (Netlify, Vercel static) can serve the app without the API: everything works except accounts, and answers stay in the browser.
+
+Production settings:
+
+| Variable | What it does |
+| --- | --- |
+| `BIOMEDIX_APP_URL` | The public `https://` address. Links in emails use it; without it they use the request's Host header. |
+| `BIOMEDIX_MAIL_WEBHOOK` | URL that receives every email as JSON `{to, subject, text, html}`: your email provider's API, or a Power Automate / Zapier flow. Without it, emails aren't delivered. |
+| `BIOMEDIX_MAIL_WEBHOOK_TOKEN` | Sent as `Authorization: Bearer …` to the webhook, if set. |
+| `BIOMEDIX_ADMIN_EMAIL` | This address becomes the first Biomedix admin once it signs up and confirms its email. |
+| `BIOMEDIX_SECRET_KEY` | 64 hex characters to encrypt two-factor secrets, instead of `data/secret.key`. |
+| `BIOMEDIX_STAFF_MFA` | `required` (default in production) or `optional`: whether Biomedix staff need two-factor. |
+| `BIOMEDIX_DEV` | `1` turns on the dev mailbox in production builds; `0` turns it off in `npm run dev`. |
+
+Staff roles can also be set from the command line where the database lives:
+
+```bash
+npm run staff -- grant someone@biomedix.example reviewer
+```
+
+In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow their links. The same page can give your own account a Biomedix staff role for testing.
 
 ## Routes
 
@@ -35,9 +55,17 @@ npm start
 | `/app/readiness` | Compliance readiness: score, four checks per procedure, next steps, agent proposals, requirements matrix |
 | `/app/history` | Run history: every saved run, the answers it changed and the documents it revised (account) |
 | `/app/suite/:docId/history` | Revision history of one document: every draft, its sign-offs, and line-by-line changes (account) |
-| `/app/projects` | Projects: one per device, with readiness, runs and import of answers made before signing in (account) |
-| `/app/account` | Profile, password, sign out, delete account (account) |
-| `/sign-in`, `/sign-up` | Account sign-in and sign-up |
+| `/app/dashboard` | Company dashboard: totals, items that need you, every project's readiness and document pipeline, team, recent activity (account) |
+| `/app/welcome` | Setup checklist after sign-up (account) |
+| `/app/settings/profile` · `security` · `sessions` | Your name and sign-in email; password and two-factor; signed-in devices (account) |
+| `/app/settings/company` · `members` · `activity` | Company name, two-factor policy, leave or delete; members, roles, approvers and invitations; the activity log (account) |
+| `/staff/reviews` | Biomedix reviewer workspace: drafts submitted by every company, with changes from the previous draft (staff) |
+| `/staff/admin` | Biomedix admin: every company and person, staff roles, two-factor reset (staff admin) |
+| `/sign-in`, `/sign-up` | Sign-in (with a two-factor step) and sign-up (creates your company, or joins one from an invitation) |
+| `/forgot-password`, `/reset-password` | Password reset by emailed link |
+| `/verify-email`, `/confirm-email` | Email confirmation for new accounts and changed addresses |
+| `/invite/:token` | Accept an invitation to a company |
+| `/dev/mail` | Dev mailbox (dev mode only) |
 
 ## Documentation flow
 
@@ -48,12 +76,43 @@ npm start
 
 5. **Publish** (`src/export/`): `structure.ts` lays out the SharePoint library from the answers (only folders the device needs); `docx.ts` writes each procedure as a Word draft; `package.ts` builds the ZIP, master document list, README and PnP PowerShell script; `sharepoint.ts` creates the library, columns, folders and files through Microsoft Graph, never overwriting existing files.
 
-## Accounts, runs and drafts
+## Accounts, companies and roles
 
-- **Accounts** (`server/`): email and password (scrypt-hashed, 12 characters minimum), sessions in an HttpOnly, SameSite=Lax cookie (only a SHA-256 of the token is stored), sign-in rate limiting, and cross-site request checks on every change. Changing the password signs out other devices.
-- **Projects**: one per device. Answers autosave as you type. On first sign-up, answers already entered in the browser become the first project; later sign-ins offer to import them.
+**Who uses Biomedix**
+
+| | Who | Can |
+| --- | --- | --- |
+| **Company** | The legal manufacturer. Owns projects, members and the activity log. A person can belong to several and switch from the top bar. | |
+| Owner | Founder, head of quality | Everything, including making owners and deleting the company |
+| Admin | QA/RA lead | Members, invitations, the two-factor policy, projects |
+| Editor | Engineers, regulatory | Answer questions, save runs, submit drafts for review |
+| Viewer | Auditors, investors, consultants | Read everything, change nothing |
+| Approver (any role) | Management representative | Approve reviewed drafts with an e-signature |
+| **Biomedix staff** | Reviewer | Sign or return technical reviews across every company |
+| | Admin | Also see every company and person, grant staff roles, reset two-factor |
+
+Approver is a separate designation, not a role, because QMS document control names who may approve independently of who administers the workspace. Roles are enforced by the server; the interface only hides what you can't do.
+
+**Sign-in flow**
+
+- **Sign up** with name, work email, company name and password (12+ characters, common passwords refused, strength meter). This creates the company with you as owner and approver, signs you in, and sends a confirmation email. Answers entered before signing up become the company's first project. A **welcome checklist** follows: confirm email, answer the questionnaire, invite your team, turn on two-factor.
+- **Confirm email**: a single-use link valid for 24 hours. Until then you can work but can't invite people or approve documents.
+- **Invitations**: admins invite by email with a role and approver flag. The link works once for 7 days and can also be copied. Opening it signs you up (email fixed to the invitation, confirmed automatically) or, if you already have an account, adds the company to it.
+- **Sign in** with email and password, then a 6-digit code from an authenticator app, or a recovery code, if two-factor is on. *Keep me signed in* gives a 30-day session; otherwise it lasts 12 hours and ends with the browser. Failed attempts are rate-limited by email and network.
+- **Forgot password**: always gives the same answer, so it can't reveal who has an account. The link works once for an hour; resetting signs out every device and sends a notice.
+- **Two-factor** (TOTP, RFC 6238): scan a QR code, confirm a code, save 10 single-use recovery codes. Codes can't be replayed. Owners and admins can **require two-factor** for the whole company; members without it are held at a setup screen. A Biomedix admin can reset two-factor for someone who lost their phone, after confirming who they are.
+- **Account settings**: change name or sign-in email (confirmed by link to the new address, with a notice to the old one), change password (signs out other devices), see and sign out **signed-in devices**, recent security activity, delete the account (blocked while you're the only owner of a company with other members).
+- **Activity log**: every company event (members, invitations, projects, runs, submissions, reviews, approvals) with who, when and from where. It's append-only.
+
+**Security**: passwords use scrypt; sessions, one-time links and recovery codes are stored only as hashes; two-factor secrets are encrypted with AES-256-GCM; cookies are HttpOnly and SameSite=Lax; every change must be JSON from this site. Approvals and technical reviews need the signer's password again (21 CFR 11.200), and record their name, email, time, meaning and the draft's SHA-256. A reviewer can't review a draft they submitted.
+
+**Not built yet**: single sign-on with Microsoft Entra ID (a natural fit alongside SharePoint), billing and plans, automatic sign-out after inactivity, and pages for the terms of service and privacy policy that sign-up refers to.
+
+## Runs and drafts
+
+- **Projects**: one per device, owned by the company. Answers autosave as you type.
 - **Runs**: each *Create documentation* saves a run, which stores a snapshot of the answers and a new **draft** of every document whose text changed (Rev A, draft 1, 2, 3…). Unchanged documents keep their draft. Runs, drafts and sign-offs are append-only, and each draft stores a SHA-256 of its text.
-- **Sign-off**: a saved draft is submitted for technical review, then signed or returned with comments in the review queue, and then approved, with the approver, signature method and reference recorded. Approval records who approved which draft; the signature itself stays in the customer's e-signature system. A new draft needs review again. In this build the account owner can sign reviews from the queue to demonstrate the flow; separate Biomedix reviewer accounts are not built yet.
+- **Sign-off**: an editor submits a saved draft; a Biomedix reviewer signs the technical review or returns it with comments; an approver in the company approves it. A new draft needs review again.
 
 ## Compliance readiness
 
@@ -75,7 +134,8 @@ To tailor another section, add a body for it in `src/templates/content.ts` using
 
 - `src/styles/tokens.css` holds the design tokens (colors, fonts, radii); `global.css` holds the shared primitives (buttons, cards, pills, badges, grid); `home.css` and `app.css` hold the page styles.
 - `src/components/` contains the shared pieces: `Logo`, `Button` / `ButtonLink`, `AppShell` (product header and nav), `Icon`, `SignoffPanel` and `Lifecycle`.
-- `src/account/` holds the API client and sign-in state; `src/intake/IntakeContext.tsx` holds the working answers and syncs them to the active project.
-- `server/` holds the account API (`api.ts`), sign-in (`auth.ts`), storage (`db.ts`) and the production server (`start.ts`).
+- `src/account/` holds the API client and sign-in state (user, companies, active company); `src/intake/IntakeContext.tsx` holds the working answers and syncs them to the active company's project.
+- `src/pages/auth/`, `src/pages/settings/` and `src/pages/staff/` hold the sign-in flows, settings and the Biomedix staff workspace.
+- `server/` holds the API: `api.ts` mounts the routes in `server/routes/` (auth, account, orgs, projects, staff, dev); `access.ts` decides who can do what; `auth.ts` handles passwords, sessions and one-time links; `totp.ts` two-factor; `mail.ts` email; `audit.ts` the activity log; `db.ts` storage and migrations; `start.ts` the production server; `cli.ts` staff roles.
 - `src/data/` contains the review queue items and the procedure library content.
 - Text in square brackets (`[YOUR PRICE]`, `[Company]`, `[Reviewer name]`) is a placeholder waiting for real content.

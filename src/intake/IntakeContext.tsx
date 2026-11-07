@@ -3,13 +3,14 @@
  * generated from them.
  *
  * Signed out, answers stay in this browser (localStorage). Signed in, they
- * belong to a project in the account: edits autosave, each "Create
+ * belong to a project in the active company: edits autosave, each "Create
  * documentation" saves a run, and every changed document gets a new draft
- * that can go through technical review and approval.
+ * that can go through technical review and approval. Viewers see the same
+ * project read-only.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useAccount } from '../account/AccountContext';
-import { api, ApiError, type Confirmed, type DraftMeta, type ProjectPayload, type Run, type Signoff, type SignoffKind } from '../account/api';
+import { can, useAccount } from '../account/AccountContext';
+import { api, ApiError, type Confirmed, type DraftMeta, type ProjectPayload, type Run, type Signoff } from '../account/api';
 import { computeReadiness, lifecycle, type DocLifecycle, type Readiness } from '../compliance/readiness';
 import { contentHash } from '../lib/hash';
 import { docHref, missingHref } from '../lib/links';
@@ -18,7 +19,7 @@ import { derive, resolveTokens, type Derived, type TokenKey, type TokenValues } 
 import { EMPTY_INTAKE, EXAMPLE_INTAKE, type Intake, type IntakeSection } from './model';
 
 const GUEST_KEY = 'biomedix.intake.v1';
-const activeKey = (userId: string) => `biomedix.project.${userId}`;
+const activeKey = (userId: string, orgId: string) => `biomedix.project.${userId}.${orgId}`;
 
 /** Fill in any fields missing from stored answers, so fields added later get their defaults. */
 export function mergeIntake(partial: Partial<Intake> | undefined): Intake {
@@ -67,17 +68,17 @@ function clearGuest() {
   }
 }
 
-function remember(userId: string, projectId: string) {
+function remember(userId: string, orgId: string, projectId: string) {
   try {
-    localStorage.setItem(activeKey(userId), projectId);
+    localStorage.setItem(activeKey(userId, orgId), projectId);
   } catch {
     /* ignore */
   }
 }
 
-function recall(userId: string): string | null {
+function recall(userId: string, orgId: string): string | null {
   try {
-    return localStorage.getItem(activeKey(userId));
+    return localStorage.getItem(activeKey(userId, orgId));
   } catch {
     return null;
   }
@@ -85,17 +86,19 @@ function recall(userId: string): string | null {
 
 interface Remote {
   id: string;
+  orgId: string;
   drafts: Record<string, DraftMeta>;
   signoffs: Signoff[];
   runs: Run[];
+  approvers: string[];
 }
 
 export type SaveState = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error';
 
 export interface SignoffExtra {
   note?: string;
-  signer?: string;
-  method?: string;
+  /** Approvals are e-signatures: the approver re-enters their password. */
+  password?: string;
   reference?: string;
 }
 
@@ -113,6 +116,12 @@ interface IntakeContextValue {
   ready: boolean;
   mode: 'guest' | 'account';
   projectId: string | null;
+  /** Signed in with view-only access: edits are ignored and nothing saves. */
+  readOnly: boolean;
+  /** The signed-in user may record approvals in this company. */
+  canApprove: boolean;
+  /** Names of the company's approvers. */
+  approvers: string[];
   loadError: string | null;
   saveState: SaveState;
   runs: Run[];
@@ -125,9 +134,11 @@ interface IntakeContextValue {
   confirm: (keys: TokenKey[]) => void;
   unconfirm: (key: TokenKey) => void;
   createRun: (note?: string) => Promise<Run>;
-  signoff: (docId: string, kind: SignoffKind, extra?: SignoffExtra) => Promise<void>;
+  signoff: (docId: string, kind: 'submit' | 'approve', extra?: SignoffExtra) => Promise<void>;
   submitReady: () => Promise<number>;
   openProject: (id: string) => Promise<void>;
+  /** Saves pending edits, then makes another company active. */
+  switchOrg: (orgId: string) => Promise<void>;
   newProject: (from?: 'blank' | 'guest') => Promise<string>;
   /** Answers left in this browser from before sign-in, not yet saved to a project. */
   guestDraft: Intake | null;
@@ -138,7 +149,7 @@ interface IntakeContextValue {
 const IntakeContext = createContext<IntakeContextValue | null>(null);
 
 export function IntakeProvider({ children }: { children: ReactNode }) {
-  const { status, user, expired } = useAccount();
+  const { status, user, org, mfaBlocked, expired, switchOrg: selectOrg } = useAccount();
   const [working, setWorking] = useState<Working>(loadGuest);
   const [remote, setRemote] = useState<Remote | null>(null);
   const [ready, setReady] = useState(false);
@@ -149,6 +160,11 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
 
   const mode = status === 'signed-in' ? 'account' : 'guest';
   const userId = user?.id ?? null;
+  const orgId = org?.id ?? null;
+  const canEdit = can(org, 'edit');
+  const readOnly = mode === 'account' && !canEdit;
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
   const dirty = useRef(false);
   const editSeq = useRef(0);
   const workingRef = useRef(working);
@@ -167,9 +183,9 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       const id = p.project.id;
       projectRef.current = id;
       dirty.current = false;
-      if (userId) remember(userId, id);
+      if (userId) remember(userId, p.project.orgId, id);
       setWorking({ source: id, intake: mergeIntake(p.project.intake), confirmed: p.project.confirmed ?? {} });
-      setRemote({ id, drafts: p.drafts, signoffs: p.signoffs, runs: p.runs });
+      setRemote({ id, orgId: p.project.orgId, drafts: p.drafts, signoffs: p.signoffs, runs: p.runs, approvers: p.approvers ?? [] });
       setSaveState('saved');
       setLoadError(null);
       setReady(true);
@@ -191,26 +207,49 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       setReady(true);
       return;
     }
+    const empty = () => {
+      projectRef.current = null;
+      dirty.current = false;
+      setRemote(null);
+      setWorking({ source: 'none', intake: EMPTY_INTAKE, confirmed: {} });
+      setSaveState('idle');
+      setLoadError(null);
+    };
+    // No company yet, or one that needs two-factor first: nothing to load.
+    if (!orgId || mfaBlocked) {
+      empty();
+      const guest = loadGuest();
+      setGuestDraft(isStarted(guest.intake) ? guest.intake : null);
+      setReady(true);
+      return;
+    }
     let live = true;
     setReady(false);
     (async () => {
       try {
-        const { projects } = await api.projects();
+        const { projects } = await api.projects(orgId);
         const guest = loadGuest();
         const guestStarted = isStarted(guest.intake);
-        let id = recall(userId);
+        let id = recall(userId, orgId);
         if (!projects.some((p) => p.id === id)) id = projects[0]?.id ?? null;
+        if (!id && !canEdit) {
+          // A viewer in a company with no projects yet.
+          if (!live) return;
+          empty();
+          setReady(true);
+          return;
+        }
         let payload: ProjectPayload;
         if (!id) {
-          // First sign-in: the answers from this browser become the first project.
-          payload = await api.createProject(guestStarted ? { intake: guest.intake, confirmed: guest.confirmed } : {});
+          // First project in this company: the answers from this browser become it.
+          payload = await api.createProject(orgId, guestStarted ? { intake: guest.intake, confirmed: guest.confirmed } : {});
           if (guestStarted) clearGuest();
         } else {
           payload = await api.project(id);
         }
         if (!live) return;
         apply(payload);
-        setGuestDraft(id && guestStarted ? guest.intake : null);
+        setGuestDraft(id && guestStarted && canEdit ? guest.intake : null);
       } catch (err) {
         if (!live) return;
         fail(err);
@@ -223,7 +262,7 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     return () => {
       live = false;
     };
-  }, [status, userId, apply, fail, attempt]);
+  }, [status, userId, orgId, mfaBlocked, canEdit, apply, fail, attempt]);
 
   /* ---------- Persist ---------- */
   useEffect(() => {
@@ -236,7 +275,7 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     async (keepalive = false) => {
       const id = projectRef.current;
       const w = workingRef.current;
-      if (!id || !dirty.current || w.source !== id) return;
+      if (!id || !dirty.current || w.source !== id || readOnlyRef.current) return;
       const seq = editSeq.current;
       setSaveState('saving');
       try {
@@ -279,6 +318,7 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
 
   /* ---------- Edits ---------- */
   const edit = useCallback((fn: (w: Working) => Working) => {
+    if (readOnlyRef.current) return;
     dirty.current = true;
     editSeq.current++;
     setWorking(fn);
@@ -327,16 +367,24 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       markdown[id] = docToMarkdown(d, tokens);
       lives[id] = lifecycle(contentHash(markdown[id]), remote?.drafts[id], remote?.signoffs ?? [], id);
     }
-    const readiness = computeReadiness(suite, tokens, lives, { signedIn: mode === 'account', docHref, missingHref });
+    const readiness = computeReadiness(suite, tokens, lives, {
+      signedIn: mode === 'account',
+      docHref,
+      missingHref,
+      canEdit: !readOnly,
+      canApprove: !!org?.approver,
+      approvers: remote?.approvers,
+    });
     return { derived, tokens, suite, markdown, lives, readiness };
-  }, [working, remote, mode]);
+  }, [working, remote, mode, readOnly, org?.approver]);
   computedRef.current = computed;
 
   /* ---------- Runs and sign-offs ---------- */
   const createRun = useCallback(
     async (note?: string) => {
       const id = projectRef.current;
-      if (!id) throw new Error('Sign in to save runs.');
+      if (!id) throw new Error(mode === 'account' ? 'Open a project first.' : 'Sign in to save runs.');
+      if (readOnlyRef.current) throw new Error('You have view-only access to this company.');
       const w = workingRef.current;
       const c = computedRef.current!;
       const seq = editSeq.current;
@@ -365,11 +413,11 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [fail],
+    [fail, mode],
   );
 
   const signoff = useCallback(
-    async (docId: string, kind: SignoffKind, extra: SignoffExtra = {}) => {
+    async (docId: string, kind: 'submit' | 'approve', extra: SignoffExtra = {}) => {
       const id = projectRef.current;
       if (!id) throw new Error('Sign in to send documents for sign-off.');
       const life = computedRef.current?.lives[docId];
@@ -411,11 +459,20 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     [apply, flush, fail],
   );
 
+  const switchOrg = useCallback(
+    async (id: string) => {
+      await flush();
+      selectOrg(id);
+    },
+    [flush, selectOrg],
+  );
+
   const newProject = useCallback(
     async (from: 'blank' | 'guest' = 'blank') => {
       await flush();
       const guest = from === 'guest' ? loadGuest() : null;
-      const payload = await api.createProject(guest ? { intake: guest.intake, confirmed: guest.confirmed } : {});
+      if (!orgId) throw new Error('Create or join a company first.');
+      const payload = await api.createProject(orgId, guest ? { intake: guest.intake, confirmed: guest.confirmed } : {});
       if (guest) {
         clearGuest();
         setGuestDraft(null);
@@ -423,7 +480,7 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       apply(payload);
       return payload.project.id;
     },
-    [apply, flush],
+    [apply, flush, orgId],
   );
 
   const discardGuest = useCallback(() => {
@@ -444,6 +501,9 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       ready: ready && status !== 'loading',
       mode,
       projectId: remote?.id ?? null,
+      readOnly,
+      canApprove: mode === 'account' && !!org?.approver,
+      approvers: remote?.approvers ?? [],
       loadError,
       saveState,
       runs: remote?.runs ?? [],
@@ -455,6 +515,7 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       signoff,
       submitReady,
       openProject,
+      switchOrg,
       newProject,
       guestDraft,
       discardGuest,
@@ -469,6 +530,8 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       ready,
       status,
       mode,
+      readOnly,
+      org,
       remote,
       loadError,
       saveState,
@@ -478,6 +541,7 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       signoff,
       submitReady,
       openProject,
+      switchOrg,
       newProject,
       guestDraft,
       discardGuest,

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAccount } from '../account/AccountContext';
 import { useIntake } from '../intake/IntakeContext';
 import { TOKENS, type TokenKey } from '../intake/derive';
 import { docHref, missingHref } from '../lib/links';
 import type { GeneratedDoc } from '../templates/generate';
 import { Button, ButtonLink } from './Button';
+import { PasswordField } from './forms';
 import { formatDate } from './Lifecycle';
 
 function useAction() {
@@ -26,14 +28,15 @@ function useAction() {
 
 /** Save → technical review → approval, for one document. */
 export function SignoffPanel({ doc }: { doc: GeneratedDoc }) {
-  const { mode, lives, readiness, tokens, createRun, signoff } = useIntake();
+  const { mode, lives, readiness, tokens, createRun, signoff, readOnly, canApprove, approvers, projectId } = useIntake();
+  const { user } = useAccount();
   const life = lives[doc.proc.id];
   const score = readiness.docs.find((d) => d.doc.proc.id === doc.proc.id);
   const act = useAction();
-  const [approver, setApprover] = useState(tokens.mgmtRep?.value ?? '');
-  const [method, setMethod] = useState(tokens.eSignature?.value ?? '');
+  const [password, setPassword] = useState('');
   const [reference, setReference] = useState('');
   const id = doc.proc.id;
+  const waitingOn = approvers.length ? approvers.join(', ') : 'an approver (none named yet)';
 
   const body = (() => {
     if (mode === 'guest') {
@@ -54,6 +57,12 @@ export function SignoffPanel({ doc }: { doc: GeneratedDoc }) {
     }
     if (!life?.latest || life.changed) {
       const nextDraft = (life?.latest?.draft ?? 0) + 1;
+      if (readOnly)
+        return (
+          <p className="oversight-panel__offer oversight-panel__offer--flush">
+            {life?.latest ? `Changed since draft ${life.latest.draft}; an editor saves the next draft.` : 'Not saved yet. An editor saves draft 1.'}
+          </p>
+        );
       return (
         <>
           <p className="oversight-panel__offer oversight-panel__offer--flush">
@@ -74,12 +83,12 @@ export function SignoffPanel({ doc }: { doc: GeneratedDoc }) {
           <>
             <p className="oversight-panel__offer oversight-panel__offer--flush">
               A Biomedix engineer reviews draft {n} and signs a technical review. Approval stays with{' '}
-              {tokens.mgmtRep?.value ?? 'your management representative'}.
+              {approvers.length ? approvers.join(', ') : (tokens.mgmtRep?.value ?? 'your approver')}.
             </p>
-            <Button variant="bright" size="sm" disabled={act.busy} onClick={() => act.run(() => signoff(id, 'submit'))}>
+            {!readOnly && <Button variant="bright" size="sm" disabled={act.busy} onClick={() => act.run(() => signoff(id, 'submit'))}>
               {act.busy ? 'Sending…' : `Submit draft ${n} for technical review`}
-            </Button>
-            {score && !score.complete && (
+            </Button>}
+            {!readOnly && score && !score.complete && (
               <span className="oversight-panel__fine">
                 You can submit with gaps; the reviewer will return it with comments.
               </span>
@@ -92,9 +101,15 @@ export function SignoffPanel({ doc }: { doc: GeneratedDoc }) {
             <p className="oversight-panel__offer oversight-panel__offer--flush">
               Draft {n} is with Biomedix technical review since {formatDate(life.history[life.history.length - 1].createdAt)}.
             </p>
-            <ButtonLink to="/app/review" variant="outline-night" size="sm">
-              Open review queue
-            </ButtonLink>
+            {user?.staffRole ? (
+              <ButtonLink to={`/staff/reviews?doc=${encodeURIComponent(`${projectId}:${id}`)}`} variant="outline-night" size="sm">
+                Open in the reviewer workspace
+              </ButtonLink>
+            ) : (
+              <ButtonLink to="/app/review" variant="outline-night" size="sm">
+                Open review queue
+              </ButtonLink>
+            )}
           </>
         );
       case 'returned':
@@ -109,7 +124,7 @@ export function SignoffPanel({ doc }: { doc: GeneratedDoc }) {
             <p className="oversight-panel__fine">
               Change the answers the reviewer asked about, then save a run to create draft {n + 1}.
             </p>
-            <div className="button-row button-row--tight">
+            {!readOnly && <div className="button-row button-row--tight">
               <ButtonLink to="/app/form" variant="bright" size="sm">
                 Edit answers
               </ButtonLink>
@@ -121,66 +136,60 @@ export function SignoffPanel({ doc }: { doc: GeneratedDoc }) {
               >
                 Resubmit as is
               </Button>
-            </div>
+            </div>}
           </>
         );
       case 'reviewed':
+        if (!canApprove)
+          return (
+            <p className="oversight-panel__offer oversight-panel__offer--flush">
+              Technical review signed by {life.review?.signer} on {life.review && formatDate(life.review.createdAt, false)}. Waiting on
+              approval by {waitingOn}.
+            </p>
+          );
         return (
           <form
             className="stack approval-form"
             onSubmit={(e) => {
               e.preventDefault();
-              void act.run(() => signoff(id, 'approve', { signer: approver, method, reference }));
+              void act.run(async () => {
+                await signoff(id, 'approve', { password, reference: reference.trim() });
+                setPassword('');
+              });
             }}
           >
             <p className="oversight-panel__offer oversight-panel__offer--flush">
               Technical review signed by {life.review?.signer} on {life.review && formatDate(life.review.createdAt, false)}.
-              Record your approval once it's signed.
             </p>
-            <label className="field__label" htmlFor={`approver-${id}`}>
-              Approver
-            </label>
-            <input
-              id={`approver-${id}`}
-              className="input input--night"
-              value={approver}
-              required
-              onChange={(e) => setApprover(e.target.value)}
-            />
-            <label className="field__label" htmlFor={`method-${id}`}>
-              Signed with
-            </label>
-            <input
-              id={`method-${id}`}
-              className="input input--night"
-              value={method}
-              placeholder="e.g. DocuSign with its Part 11 module"
-              onChange={(e) => setMethod(e.target.value)}
-            />
+            <p className="oversight-panel__fine">
+              Signing as <strong>{user?.name}</strong> ({user?.email}) with the meaning <strong>Approved</strong>, for draft {n}.
+            </p>
+            <input type="text" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
+            <PasswordField id={`approve-pw-${id}`} label="Your password, to sign" value={password} onChange={setPassword} autoComplete="current-password" night />
             <label className="field__label" htmlFor={`ref-${id}`}>
-              Signature reference
+              External signature reference (optional)
             </label>
             <input
               id={`ref-${id}`}
               className="input input--night"
               value={reference}
-              placeholder="Envelope or agreement ID"
+              placeholder="If you also signed in DocuSign or similar"
               onChange={(e) => setReference(e.target.value)}
             />
-            <Button type="submit" variant="bright" size="sm" disabled={act.busy || !approver.trim()}>
-              {act.busy ? 'Recording…' : `Record approval of draft ${n}`}
+            <Button type="submit" variant="bright" size="sm" disabled={act.busy || !password || !user?.emailVerified}>
+              {act.busy ? 'Signing…' : `Approve draft ${n}`}
             </Button>
-            <span className="oversight-panel__fine">
-              The signature itself stays in your e-signature system; this records who approved which draft.
-            </span>
+            {!user?.emailVerified && <span className="oversight-panel__fine">Confirm your email address before you approve documents.</span>}
           </form>
         );
       case 'approved':
         return (
           <>
             <p className="oversight-panel__offer oversight-panel__offer--flush">
-              Draft {n} approved by {life.approval?.signer} on {life.approval && formatDate(life.approval.createdAt, false)}
-              {life.approval?.method ? ` (${life.approval.method}${life.approval.reference ? `, ${life.approval.reference}` : ''})` : ''}.
+              Draft {n} approved by {life.approval?.signer}
+              {life.approval?.signerEmail ? ` (${life.approval.signerEmail})` : ''} on{' '}
+              {life.approval && formatDate(life.approval.createdAt)}
+              {life.approval?.method ? `, ${life.approval.method}${life.approval.reference ? `, ref. ${life.approval.reference}` : ''}` : ''}.
             </p>
             <span className="oversight-panel__fine">
               If an answer this document uses changes, the next run creates a new draft that needs review again.
