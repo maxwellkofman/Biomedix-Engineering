@@ -274,7 +274,7 @@ export function onApiError(fn: Listener) {
   };
 }
 
-async function call<T>(method: string, path: string, body?: unknown, opts: { keepalive?: boolean } = {}): Promise<T> {
+export async function call<T>(method: string, path: string, body?: unknown, opts: { keepalive?: boolean } = {}): Promise<T> {
   let res: Response;
   const payload = body ?? (method === 'GET' ? undefined : {});
   try {

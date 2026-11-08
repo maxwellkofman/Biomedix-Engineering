@@ -23,6 +23,9 @@ import ReviewQueue from './pages/ReviewQueue';
 import Setup from './pages/Setup';
 import { Activity, CompanySettings, Members } from './pages/settings/Company';
 import { Profile, Security, Sessions } from './pages/settings/Personal';
+import RequestForm from './pages/requests/RequestForm';
+import RequestStatus from './pages/requests/RequestStatus';
+import { StaffRequests, StaffScan, StaffScans } from './pages/staff/Scans';
 import { StaffAdmin, StaffReviews } from './pages/staff/Staff';
 import Suite from './pages/Suite';
 
@@ -44,6 +47,10 @@ const TITLES: Record<string, string> = {
   '/app/settings/activity': 'Activity log · Settings · Biomedix Engineering',
   '/staff/reviews': 'Technical reviews · Biomedix staff',
   '/staff/admin': 'Companies and people · Biomedix staff',
+  '/staff/scans': 'Gap scans · Biomedix staff',
+  '/staff/requests': 'Demo requests · Biomedix staff',
+  '/demo': 'Book a demo · Biomedix Engineering',
+  '/gap-scan': 'Free gap scan · Biomedix Engineering',
   '/dev/mail': 'Dev mailbox · Biomedix Engineering',
   '/app/review': 'Review queue · Biomedix Engineering',
   '/app/procedures': 'Procedure library · Biomedix Engineering',
@@ -63,6 +70,10 @@ function useRouteChrome() {
         ? 'Setup · Biomedix Engineering'
         : pathname.startsWith('/invite/')
           ? 'Invitation · Biomedix Engineering'
+          : pathname.startsWith('/request/')
+            ? 'Your request · Biomedix Engineering'
+            : pathname.startsWith('/staff/scans/')
+              ? 'Gap scan · Biomedix staff'
           : pathname.endsWith('/history')
             ? 'Revision history · Biomedix Engineering'
             : 'Biomedix Engineering');
@@ -139,6 +150,9 @@ export default function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/confirm-email" element={<VerifyEmail change />} />
       <Route path="/invite/:token" element={<AcceptInvite />} />
+      <Route path="/demo" element={<RequestForm key="demo" mode="demo" />} />
+      <Route path="/gap-scan" element={<RequestForm key="scan" mode="scan" />} />
+      <Route path="/request/:token" element={<RequestStatus />} />
       <Route path="/app" element={<AppIndex />} />
       <Route path="/app/dashboard" element={app(<Dashboard />, true)} />
       <Route path="/app/welcome" element={settings(<Welcome />)} />
@@ -151,6 +165,9 @@ export default function App() {
       <Route path="/app/settings/activity" element={app(<Activity />, true)} />
       <Route path="/staff/reviews" element={settings(<StaffReviews />)} />
       <Route path="/staff/admin" element={settings(<StaffAdmin />)} />
+      <Route path="/staff/scans" element={settings(<StaffScans />)} />
+      <Route path="/staff/scans/:id" element={settings(<StaffScan />)} />
+      <Route path="/staff/requests" element={settings(<StaffRequests />)} />
       <Route path="/dev/mail" element={<AppRoute open>{<DevMail />}</AppRoute>} />
       <Route path="/app/review" element={app(<ReviewQueue />)} />
       <Route path="/app/procedures" element={app(<ProcedureLibrary />)} />

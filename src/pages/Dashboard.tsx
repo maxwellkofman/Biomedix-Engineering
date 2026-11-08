@@ -8,10 +8,12 @@ import { formatDate, ReadinessRing } from '../components/Lifecycle';
 import { useIntake } from '../intake/IntakeContext';
 import { describeAudit, timeAgo } from '../lib/audit';
 import { docHref } from '../lib/links';
+import { formatWhen, requestsApi, SCAN_STATUS_LABEL, type MyRequest } from '../requests/api';
 import '../styles/app.css';
 import '../styles/flow.css';
 import '../styles/account.css';
 import '../styles/org.css';
+import '../styles/requests.css';
 
 const PIPELINE: { key: keyof DocCounts; label: string }[] = [
   { key: 'approved', label: 'Approved' },
@@ -183,6 +185,62 @@ function NoCompany() {
         </div>
       </form>
     </main>
+  );
+}
+
+/** The signed-in person's demo requests and gap scans, linking to each one's status page. */
+function MyRequests() {
+  const [rows, setRows] = useState<MyRequest[] | null>(null);
+  useEffect(() => {
+    requestsApi
+      .mine()
+      .then((r) => setRows(r.requests))
+      .catch(() => setRows([]));
+  }, []);
+  if (!rows) return null;
+  if (!rows.length)
+    return (
+      <section className="card card--compact stack" aria-labelledby="scan-cta-h">
+        <h2 id="scan-cta-h" className="card__title card__title--sm">
+          Free gap scan
+        </h2>
+        <p className="text-muted-sm">Share your current trace matrix, risk file or test reports. An engineer reviews what the checks find and sends a report.</p>
+        <Link to="/gap-scan" className="text-muted-sm">
+          Start a gap scan →
+        </Link>
+      </section>
+    );
+  return (
+    <section className="card card--compact stack" aria-labelledby="req-h">
+      <div className="outline__head">
+        <h2 id="req-h" className="card__title card__title--sm">
+          Gap scans and demos
+        </h2>
+        <Link to="/gap-scan" className="text-muted-sm">
+          New scan →
+        </Link>
+      </div>
+      <ul className="list-reset stack dash-requests">
+        {rows.slice(0, 4).map((r) => (
+          <li key={r.id} className="dash-requests__item">
+            <Link to={`/request/${r.token}`}>
+              {r.scan ? 'Gap scan' : 'Demo'} · {r.company}
+            </Link>
+            <span className="text-muted-sm">
+              {r.scan
+                ? r.scan.status === 'sent'
+                  ? `Report ready · ${r.scan.findings ?? 0} gap${r.scan.findings === 1 ? '' : 's'}`
+                  : r.scan.status === 'received' || r.scan.status === 'in_review'
+                    ? `With an engineer · report by ${formatWhen(r.scan.dueAt)}`
+                    : SCAN_STATUS_LABEL[r.scan.status]
+                : r.demo.scheduledAt
+                  ? 'Demo booked'
+                  : 'Demo requested'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -485,6 +543,8 @@ export default function Dashboard() {
 
           <div className="stack dash-side">
             {setupLeft > 0 && <GettingStarted steps={steps} />}
+
+            <MyRequests />
 
             <section className="card card--compact stack" aria-labelledby="team-h">
               <div className="outline__head">

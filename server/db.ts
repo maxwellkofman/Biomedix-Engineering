@@ -214,6 +214,86 @@ const MIGRATIONS: (string | ((d: DatabaseSync) => void))[] = [
       DROP TABLE user_org;
     `);
   },
+  // v3: demo requests and gap scans. Uploaded files are kept as blobs until
+  // the retention sweep (or the requester) deletes them; findings stay.
+  `
+  CREATE TABLE inquiries (
+    id TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    token_sealed TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL COLLATE NOCASE,
+    company TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT '',
+    device TEXT NOT NULL DEFAULT '',
+    device_type TEXT NOT NULL DEFAULT '',
+    stage TEXT NOT NULL DEFAULT '',
+    ai INTEGER NOT NULL DEFAULT 0,
+    message TEXT NOT NULL DEFAULT '',
+    wants_demo INTEGER NOT NULL DEFAULT 0,
+    scheduled_at TEXT,
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'scheduled', 'closed')),
+    notes TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    org_id TEXT REFERENCES orgs(id) ON DELETE SET NULL,
+    ip TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX inquiries_created ON inquiries(created_at);
+  CREATE INDEX inquiries_user ON inquiries(user_id);
+  CREATE TABLE gap_scans (
+    id TEXT PRIMARY KEY,
+    inquiry_id TEXT NOT NULL UNIQUE REFERENCES inquiries(id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('uploading', 'received', 'in_review', 'sent', 'withdrawn')),
+    focus TEXT NOT NULL DEFAULT '',
+    reviewer_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    reviewer_name TEXT NOT NULL DEFAULT '',
+    summary TEXT NOT NULL DEFAULT '',
+    coverage TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    submitted_at TEXT,
+    due_at TEXT,
+    sent_at TEXT,
+    files_deleted_at TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX gap_scans_status ON gap_scans(status, due_at);
+  CREATE TABLE gap_scan_files (
+    id TEXT PRIMARY KEY,
+    scan_id TEXT NOT NULL REFERENCES gap_scans(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'other',
+    pages INTEGER,
+    read_status TEXT NOT NULL DEFAULT 'pending',
+    read_note TEXT NOT NULL DEFAULT '',
+    content BLOB,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX gap_scan_files_scan ON gap_scan_files(scan_id, created_at);
+  CREATE TABLE gap_findings (
+    id TEXT PRIMARY KEY,
+    scan_id TEXT NOT NULL REFERENCES gap_scans(id) ON DELETE CASCADE,
+    file_id TEXT REFERENCES gap_scan_files(id) ON DELETE SET NULL,
+    source TEXT NOT NULL CHECK (source IN ('auto', 'engineer')),
+    rule TEXT NOT NULL DEFAULT '',
+    severity TEXT NOT NULL CHECK (severity IN ('high', 'medium', 'low')),
+    area TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    fix TEXT NOT NULL DEFAULT '',
+    clause TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL CHECK (status IN ('open', 'kept', 'dismissed')),
+    edited INTEGER NOT NULL DEFAULT 0,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX gap_findings_scan ON gap_findings(scan_id, position);
+  `,
 ];
 
 let db: DatabaseSync | null = null;

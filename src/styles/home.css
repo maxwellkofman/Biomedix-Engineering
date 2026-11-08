@@ -543,3 +543,24 @@
   font-weight: 600;
   text-decoration: none;
 }
+
+.cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .cta__actions .btn {
+    width: 100%;
+  }
+}
+.how__link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.how__link:hover {
+  text-decoration: underline;
+}

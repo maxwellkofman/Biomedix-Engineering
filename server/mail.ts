@@ -10,7 +10,19 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from './db.ts';
 
-export type Template = 'verify' | 'reset' | 'invite' | 'email-change' | 'password-changed' | 'email-changed' | 'mfa-changed';
+export type Template =
+  | 'verify'
+  | 'reset'
+  | 'invite'
+  | 'email-change'
+  | 'password-changed'
+  | 'email-changed'
+  | 'mfa-changed'
+  | 'request-team'
+  | 'scan-team'
+  | 'demo-received'
+  | 'scan-received'
+  | 'scan-report';
 
 interface Message {
   subject: string;
@@ -61,6 +73,56 @@ function compose(t: Template, v: Record<string, string>): Message {
         subject: 'Your Biomedix password changed',
         lines: [`Hi ${v.name},`, 'The password for your Biomedix account was just changed and other devices were signed out.', 'If you didn’t do this, reset your password now.'],
         action: { label: 'Reset password', url: v.url },
+      };
+    case 'request-team':
+      return {
+        subject: `New ${v.label}: ${v.company}`,
+        lines: [
+          `${v.name} (${v.email}${v.role ? `, ${v.role}` : ''}) at ${v.company} asked for ${v.kind}.`,
+          [v.device && `Device: ${v.device}`, v.deviceType && `Type: ${v.deviceType}`, v.stage && `Stage: ${v.stage}`].filter(Boolean).join(' · '),
+          ...(v.message ? [`“${v.message}”`] : []),
+        ].filter(Boolean),
+        action: { label: 'Open in the Biomedix workspace', url: v.url },
+      };
+    case 'scan-team':
+      return {
+        subject: `Gap scan to review: ${v.company} (due ${v.due})`,
+        lines: [
+          `${v.name} at ${v.company} shared ${v.files} for a gap scan.`,
+          `Automated checks flagged ${v.findings}. Keep or dismiss each one, add your own, and send the report by ${v.due}.`,
+        ],
+        action: { label: 'Review the gap scan', url: v.url },
+      };
+    case 'demo-received':
+      return {
+        subject: 'Your Biomedix demo request',
+        lines: [
+          `Hi ${v.name},`,
+          v.booking
+            ? 'Thanks for asking for a demo. If you haven’t picked a time yet, use the link below; your details are already filled in.'
+            : 'Thanks for asking for a demo. We’ll email you within one business day with times for a 30-minute call.',
+          'Bring your device description and any questions about design controls, risk or your submission.',
+        ],
+        action: { label: v.booking ? 'Pick a time' : 'View your request', url: v.url },
+      };
+    case 'scan-received':
+      return {
+        subject: 'We’ve got your files for the Biomedix gap scan',
+        lines: [
+          `Hi ${v.name},`,
+          `We received ${v.files}. A Biomedix engineer will review the automated checks and send your gap scan by ${v.due}.`,
+          'Only Biomedix engineers can open your files. You can delete them from the link below at any time.',
+        ],
+        action: { label: 'Check the status', url: v.url },
+      };
+    case 'scan-report':
+      return {
+        subject: `Your gap scan is ready: ${v.company}`,
+        lines: [
+          `Hi ${v.name},`,
+          `${v.reviewer} reviewed your files and found ${v.findings}. The report lists each gap, where we found it, the clause behind it and what to do next.`,
+        ],
+        action: { label: 'Read the report', url: v.url },
       };
     case 'mfa-changed':
       return {

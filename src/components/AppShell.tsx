@@ -217,6 +217,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                         <Link to="/staff/reviews" className="menu__item">
                           Biomedix reviews
                         </Link>
+                        <Link to="/staff/scans" className="menu__item">
+                          Gap scans
+                        </Link>
+                        <Link to="/staff/requests" className="menu__item">
+                          Demo requests
+                        </Link>
                         {user.staffRole === 'admin' && (
                           <Link to="/staff/admin" className="menu__item">
                             Biomedix admin

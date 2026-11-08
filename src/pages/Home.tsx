@@ -120,7 +120,7 @@ const GATE_ZERO = [
 ];
 
 const ONBOARDING = [
-  { label: '01 · FREE', title: 'Gap scan', body: 'Agents read your current requirements, risk file or test reports; an engineer walks you through the gaps they found.', current: true },
+  { label: '01 · FREE', title: 'Gap scan', body: 'Agents read your current requirements, risk file or test reports; an engineer walks you through the gaps they found.', current: true, href: '/gap-scan' },
   { label: '02 · WEEK 1', title: 'Gate zero', body: 'Device status, classification, pathway, cyber and AI questions answered and signed before agents start.' },
   { label: '03 · WEEKS 2–6', title: 'Agents onboard', body: 'Agents tailor the procedure set and build your trace graph from the work you already have; engineers review every output.' },
   { label: '04 · ONGOING', title: 'Always on', body: 'Agents keep the system current as your design changes. Your team approves; engineers review on retainer.' },
@@ -142,7 +142,7 @@ export default function Home() {
             <Link to={status === 'signed-in' ? '/app/dashboard' : '/sign-in'} className="site-nav__link">
               {status === 'signed-in' ? 'Dashboard' : 'Sign in'}
             </Link>
-            <ButtonLink to="#start" variant="bright">
+            <ButtonLink to="/demo" variant="bright">
               Book a demo
             </ButtonLink>
           </nav>
@@ -158,7 +158,7 @@ export default function Home() {
               your team approves it.
             </p>
             <div className="hero__actions">
-              <ButtonLink to="#start" variant="bright" size="lg">
+              <ButtonLink to="/demo" variant="bright" size="lg">
                 Book a demo
               </ButtonLink>
               <ButtonLink to="/app/review" variant="outline-night" size="lg">
@@ -385,6 +385,11 @@ export default function Home() {
               <span className="mono how__label">{step.label}</span>
               <h3 className="how__step-title">{step.title}</h3>
               <p className="card__body">{step.body}</p>
+              {'href' in step && step.href && (
+                <Link to={step.href} className="how__link">
+                  Start a free gap scan →
+                </Link>
+              )}
             </li>
           ))}
         </ol>
@@ -397,9 +402,14 @@ export default function Home() {
             Share your trace matrix, risk file or test reports. You get a free gap scan, reviewed by an engineer, within
             48 hours.
           </p>
-          <ButtonLink to="#start" variant="primary" size="xl">
-            Book a demo and gap scan
-          </ButtonLink>
+          <div className="cta__actions">
+            <ButtonLink to="/demo?scan=1" variant="primary" size="xl">
+              Book a demo and gap scan
+            </ButtonLink>
+            <ButtonLink to="/gap-scan" variant="outline" size="xl">
+              Just the gap scan
+            </ButtonLink>
+          </div>
           <Link to="/app/setup/company" className="cta__alt">
             Or start drafting your documentation suite now →
           </Link>
@@ -422,7 +432,8 @@ export default function Home() {
             <a href="#oncall">Engineer on call</a>
             <Link to="/app/procedures">Procedure library</Link>
             <Link to="/app/review">Review queue</Link>
-            <a href="#start">Contact</a>
+            <Link to="/gap-scan">Free gap scan</Link>
+            <Link to="/demo">Contact</Link>
             <span className="site-footer__copy">© 2026 Biomedix Engineering</span>
           </nav>
         </div>

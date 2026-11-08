@@ -38,7 +38,12 @@ export interface Route {
   auth: 'public' | 'user';
   status: number;
   handler: Handler<User | null>;
+  /** The handler reads the request body itself (file uploads); see upload(). */
+  raw?: boolean;
 }
+
+/** Returned by a handler that has already written its own response (file downloads). */
+export const SENT = Symbol('sent');
 
 function compile(pattern: string) {
   const keys: string[] = [];
@@ -61,6 +66,14 @@ export function route(method: string, pattern: string, handler: Handler<User>, s
 /** A route anyone can call; `user` is set when a session is present. */
 export function open(method: string, pattern: string, handler: Handler<User | null>, status = 200): Route {
   return { method, ...compile(pattern), auth: 'public', status, handler };
+}
+
+/**
+ * A public PUT whose body is the file itself (Content-Type application/octet-stream),
+ * read with readRaw(). PUT can't be sent cross-site without a CORS preflight.
+ */
+export function upload(pattern: string, handler: Handler<User | null>, status = 200): Route {
+  return { method: 'PUT', ...compile(pattern), auth: 'public', status, handler, raw: true };
 }
 
 /* ---------- Input helpers ---------- */
@@ -171,6 +184,25 @@ export function readBody(req: IncomingMessage): Promise<Json> {
   });
 }
 
+/** Reads a raw request body up to max bytes. */
+export function readRaw(req: IncomingMessage, max: number): Promise<Buffer> {
+  const declared = Number(req.headers['content-length'] ?? -1);
+  if (declared > max) return Promise.reject(new HttpError(413, `Files can be up to ${Math.round(max / 1024 / 1024)} MB.`));
+  return new Promise((ok, fail) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > max) {
+        fail(new HttpError(413, `Files can be up to ${Math.round(max / 1024 / 1024)} MB.`));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => ok(Buffer.concat(chunks)));
+    req.on('error', fail);
+  });
+}
+
 export function send(res: ServerResponse, status: number, data: unknown) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -184,11 +216,13 @@ export function send(res: ServerResponse, status: number, data: unknown) {
  * a cross-site HTML form can't send; PUT, PATCH and DELETE can't be sent cross-site
  * at all without a CORS preflight, which this API never grants.
  */
-export function checkOrigin(req: IncomingMessage) {
+export function checkOrigin(req: IncomingMessage, raw = false) {
   if (req.method === 'GET' || req.method === 'HEAD') return;
   const type = req.headers['content-type'] ?? '';
   const hasBody = Number(req.headers['content-length'] ?? 0) > 0 || !!req.headers['transfer-encoding'];
-  if ((req.method === 'POST' || hasBody) && !type.startsWith('application/json')) throw new HttpError(415, 'Send JSON.');
+  if (raw) {
+    if (req.method !== 'PUT' || !type.startsWith('application/octet-stream')) throw new HttpError(415, 'Send the file as application/octet-stream.');
+  } else if ((req.method === 'POST' || hasBody) && !type.startsWith('application/json')) throw new HttpError(415, 'Send JSON.');
   const origin = req.headers.origin;
   if (origin) {
     const host = req.headers['x-forwarded-host'] ?? req.headers.host;

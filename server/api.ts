@@ -5,12 +5,13 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { sessionUser, sweep } from './auth.ts';
-import { checkOrigin, clientIp, HttpError, readBody, send, type Route } from './http.ts';
+import { checkOrigin, clientIp, HttpError, readBody, send, SENT, type Route } from './http.ts';
 import { accountRoutes } from './routes/account.ts';
 import { authRoutes } from './routes/auth.ts';
 import { devRoutes } from './routes/dev.ts';
 import { orgRoutes } from './routes/orgs.ts';
 import { projectRoutes } from './routes/projects.ts';
+import { requestRoutes, sweepRequests } from './routes/requests.ts';
 import { staffRoutes } from './routes/staff.ts';
 
 type Next = (err?: unknown) => void;
@@ -31,7 +32,7 @@ function appUrl(req: IncomingMessage, dev: boolean) {
 }
 
 export function apiMiddleware({ dev = false }: { dev?: boolean } = {}) {
-  const routes: Route[] = [...authRoutes, ...accountRoutes, ...orgRoutes, ...projectRoutes, ...staffRoutes, ...(dev ? devRoutes : [])];
+  const routes: Route[] = [...authRoutes, ...accountRoutes, ...orgRoutes, ...projectRoutes, ...requestRoutes, ...staffRoutes, ...(dev ? devRoutes : [])];
   let swept = false;
 
   return async (req: IncomingMessage, res: ServerResponse, next: Next) => {
@@ -41,17 +42,21 @@ export function apiMiddleware({ dev = false }: { dev?: boolean } = {}) {
     try {
       if (!swept) {
         swept = true;
-        sweep();
-        setInterval(sweep, 60 * 60_000).unref();
+        const all = () => {
+          sweep();
+          sweepRequests();
+        };
+        all();
+        setInterval(all, 60 * 60_000).unref();
       }
-      checkOrigin(req);
-      const body = req.method === 'GET' || req.method === 'HEAD' ? {} : await readBody(req);
       let pathMatched = false;
       for (const r of routes) {
         const m = path.match(r.re);
         if (!m) continue;
         pathMatched = true;
         if (r.method !== req.method) continue;
+        checkOrigin(req, r.raw);
+        const body = r.raw || req.method === 'GET' || req.method === 'HEAD' ? {} : await readBody(req);
         const session = sessionUser(req);
         if (r.auth === 'user' && !session) throw new HttpError(401, 'Sign in to continue.', 'signed_out');
         const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
@@ -67,8 +72,10 @@ export function apiMiddleware({ dev = false }: { dev?: boolean } = {}) {
           dev,
           appUrl: appUrl(req, dev),
         });
+        if (out === SENT) return;
         return send(res, r.status, out);
       }
+      checkOrigin(req);
       throw pathMatched ? new HttpError(405, 'Method not allowed.') : new HttpError(404, 'Not found.');
     } catch (err) {
       if (err instanceof HttpError) return send(res, err.status, { error: err.message, ...(err.code ? { code: err.code } : {}) });

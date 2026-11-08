@@ -24,12 +24,18 @@ const TABS: { key: Tab; label: string; count: 'in_review' | 'returned' | 'awaiti
 
 const KIND_LABEL = { submit: 'Submitted', review: 'Technical review signed', return: 'Returned', approve: 'Approved' } as const;
 
-function StaffNav() {
+export function StaffNav() {
   const { user } = useAccount();
   return (
     <nav className="staff-tabs" aria-label="Biomedix">
       <NavLink to="/staff/reviews" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
         Technical reviews
+      </NavLink>
+      <NavLink to="/staff/scans" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
+        Gap scans
+      </NavLink>
+      <NavLink to="/staff/requests" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
+        Demo requests
       </NavLink>
       {user?.staffRole === 'admin' && (
         <NavLink to="/staff/admin" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
@@ -40,7 +46,7 @@ function StaffNav() {
   );
 }
 
-function Blocked({ error }: { error: ApiError | Error }) {
+export function Blocked({ error }: { error: ApiError | Error }) {
   const mfa = error instanceof ApiError && error.code === 'mfa_required';
   return (
     <AppShell>
