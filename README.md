@@ -60,6 +60,9 @@ In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow
 | `/app/suite/:docId` | One tailored procedure, with Word/Markdown export and submit-for-review |
 | `/app/publish` | Publish to SharePoint: library preview, direct upload, ZIP download, PowerShell script |
 | `/app/readiness` | Compliance readiness: score, four checks per procedure, next steps, agent proposals, requirements matrix |
+| `/app/assessments` | Assessments overview: progress on the Part 11 and risk assessments |
+| `/app/assessments/part11` | 21 CFR Part 11 assessment: systems, scope, risk, controls, findings (writes FRM-019) |
+| `/app/assessments/risk` | ISO 14971 risk assessment: acceptability matrix, hazards, controls, residual and overall risk (writes RMF-001) |
 | `/app/history` | Run history: every saved run, the answers it changed and the documents it revised (account) |
 | `/app/suite/:docId/history` | Revision history of one document: every draft, its sign-offs, and line-by-line changes (account) |
 | `/app/dashboard` | Company dashboard: totals, items that need you, every project's readiness and document pipeline, team, recent activity (account) |
@@ -84,6 +87,23 @@ In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow
 4. **Review**: filled values are highlighted, derived values dashed, missing ones link straight to the setup field. Documents export as Markdown or print to PDF, and *Submit for technical review* puts them in the review queue.
 
 5. **Publish** (`src/export/`): `structure.ts` lays out the SharePoint library from the answers (only folders the device needs); `docx.ts` writes each procedure as a Word draft; `package.ts` builds the ZIP, master document list, README and PnP PowerShell script; `sharepoint.ts` creates the library, columns, folders and files through Microsoft Graph, never overwriting existing files.
+
+## Assessments
+
+Two assessments sit next to the procedures. Each is a checklist the customer works through, and each produces a document in the suite (`src/assessments/docs.ts`), so it is saved in runs, reviewed, approved, exported to Word and published to SharePoint like any procedure. Answers are stored with the rest of the project's answers (`intake.part11`, `intake.risk`).
+
+**21 CFR Part 11 (FRM-019)**, `src/assessments/part11.ts`
+- Systems come from the setup answers (document system, e-signature tool, QMS and development tools, and the Biomedix platform). Known systems (Biomedix, SharePoint, Google Drive, DocuSign, Acrobat Sign) bring suggested answers marked *Suggested* until the customer confirms them; others start blank.
+- Scope follows FDA's 2003 Scope and Application guidance: predicate-rule records relied on electronically, or electronic signatures used in place of handwritten ones. Each system in scope is rated High, Medium or Low risk.
+- Controls: 11.10(a) to (k), 11.30 for open systems, 11.50, 11.70, 11.100(a), 11.200 and 11.300 for signatures, and company-wide 11.10(i), 11.10(j), 11.100(b) and 11.100(c). Partly met and Not met need a corrective action. A partly met control under enforcement discretion (11.10(a), (b), (c), (e), (k)(2)) on a Medium or Low risk system can instead be accepted on documented risk.
+
+**ISO 14971 risk assessment (RMF-001)**, `src/assessments/risk.ts`
+- Severity S1 to S5 and probability per use, on the SOP-003 matrix (editable per device; Acceptable, Reduce further, Unacceptable).
+- Hazards suggested from the device profile (patient contact, sterility, hardware, software, connectivity, AI, use and labeling) with typical controls; the team adds or dismisses each and adds its own. References (H-001, RC-001.1) are never reused.
+- Each hazard needs a sequence of events, hazardous situation, harm, severity and probability; a control when it isn't acceptable; implementation and effectiveness evidence for each control; residual rating and a 7.6 new-hazard check; a benefit-risk rationale when residual risk isn't acceptable. It warns when a control lowers severity or when information for safety is the only control.
+- Overall residual risk (clause 8): method, benefits, disclosure and the decision.
+
+Both feed readiness: their checklist items count toward *Values filled*, unconfirmed suggestions toward *Agent proposals confirmed*, and FRM-019 and RMF-001 join the Part 11, ISO 14971, 4.1.6 and 7.1 rows of the requirements matrix.
 
 ## Accounts, companies and roles
 
@@ -169,4 +189,5 @@ To tailor another section, add a body for it in `src/templates/content.ts` using
 - `server/scan/` reads uploaded files (`extract.ts`, with `zip.ts` for Word and Excel) and runs the gap checks (`checks.ts`).
 - `server/` holds the API: `api.ts` mounts the routes in `server/routes/` (auth, account, orgs, projects, requests, staff, dev); `access.ts` decides who can do what; `auth.ts` handles passwords, sessions and one-time links; `totp.ts` two-factor; `mail.ts` email; `audit.ts` the activity log; `db.ts` storage and migrations; `start.ts` the production server; `cli.ts` staff roles.
 - `src/data/` contains the review queue items and the procedure library content.
+- `src/assessments/` holds the Part 11 and risk assessment models, checks and document builders; `src/pages/assessments/` their pages.
 - Text in square brackets (`[YOUR PRICE]`, `[Company]`, `[Reviewer name]`) is a placeholder waiting for real content.

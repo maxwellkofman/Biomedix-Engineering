@@ -59,7 +59,8 @@ export function buildTree(suite: Suite, ix: Intake, tokens: TokenValues): QmsFol
     ...(has('SOP-009') ? [folder('Process Validation', 'IQ, OQ and PQ protocols and reports (SOP-009)')] : []),
     folder('Complaints and MDR', 'Complaint records and MDR decisions (SOP-016)'),
     folder('Corrections and Removals', 'Field action records (SOP-017)'),
-    folder('Software Tool Validation', 'Software register and assurance records (SOP-014)'),
+    folder('Software Tool Validation', 'Software register, assurance records and the Part 11 assessment (SOP-014, FRM-019)', [], doc('FRM-019')),
+    ...(!has('SOP-002') && has('RMF-001') ? [folder('Risk Management', 'Risk assessment and risk management records (SOP-003)', [], doc('RMF-001'))] : []),
   ]);
   records.folders[0].files.push({ kind: 'master-list', name: 'FRM-002 Master Document List.csv' });
 
@@ -76,7 +77,7 @@ export function buildTree(suite: Suite, ix: Intake, tokens: TokenValues): QmsFol
       folder('08 Design Transfer'),
       folder('09 Design Changes'),
       folder('10 Traceability'),
-      folder('11 Risk Management File', 'Plan, hazard analysis, FMEAs, report (SOP-003)'),
+      folder('11 Risk Management File', 'Plan, risk assessment, FMEAs, report (SOP-003)', [], doc('RMF-001')),
       ...(has('SW-SOP-001') ? [folder('12 Software', 'S1–S8 records (SW-SOP-001)')] : []),
       ...(has('SW-SOP-002') ? [folder('13 Cybersecurity', 'Threat model, SBOM, security risk (SW-SOP-002)')] : []),
       ...(has('SW-SOP-003')

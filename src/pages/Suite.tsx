@@ -6,7 +6,7 @@ import { missingHref, Segments } from '../components/Segments';
 import { TIERS } from '../data/procedures';
 import { useIntake } from '../intake/IntakeContext';
 import { TOKENS } from '../intake/derive';
-import { downloadText, suiteToMarkdown, type GeneratedDoc } from '../templates/generate';
+import { downloadText, openItems, suiteToMarkdown, type GeneratedDoc } from '../templates/generate';
 import { docHref } from '../lib/links';
 import '../styles/app.css';
 import '../styles/flow.css';
@@ -16,7 +16,7 @@ export { docHref };
 export function StatusPill({ doc }: { doc: GeneratedDoc }) {
   if (doc.status === 'na') return <span className="status status--na">Not applicable</span>;
   if (doc.status === 'ready') return <span className="status status--ready">Ready for review</span>;
-  return <span className="status status--input">Needs input · {doc.missing.length}</span>;
+  return <span className="status status--input">Needs input · {openItems(doc)}</span>;
 }
 
 export default function Suite() {
@@ -68,6 +68,7 @@ export default function Suite() {
   }
 
   const company = tokens.company?.value ?? 'your company';
+  const assessments = suite.applicable.filter((d) => d.progress && (d.progress.done < d.progress.total || d.progress.suggested));
   const runNo = Number(params.get('run'));
   const run = runNo ? runs.find((r) => r.number === runNo) : undefined;
 
@@ -187,7 +188,9 @@ export default function Suite() {
                                 ? doc.reason
                                 : doc.pending
                                   ? `Included until you answer: ${doc.pending}`
-                                  : `${doc.proc.sections.length} sections · owner `}
+                                  : doc.progress
+                                  ? `Assessment · ${doc.progress.done} of ${doc.progress.total} items · owner `
+                                  : `${doc.sections.length} sections · owner `}
                               {doc.status !== 'na' && !doc.pending && <Segments segs={[{ kind: 'token', key: doc.ownerToken }]} />}
                             </span>
                           </span>
@@ -225,8 +228,26 @@ export default function Suite() {
               <h2 id="missing-h" className="card__title card__title--sm">
                 What's still missing
               </h2>
+              {assessments.length > 0 && (
+                <ul className="list-reset stack missing-list">
+                  {assessments.map((d) => (
+                    <li key={d.proc.id}>
+                      <Link to={d.progress!.href} className="missing-list__item">
+                        <span>
+                          {d.progress!.name[0].toUpperCase() + d.progress!.name.slice(1)} ({d.proc.id})
+                        </span>
+                        <span className="missing-list__count">
+                          {d.progress!.total - d.progress!.done ? `${d.progress!.total - d.progress!.done} left` : `${d.progress!.suggested} to review`}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {suite.missing.length === 0 ? (
-                <p className="text-sm ink-2">Nothing. Every required procedure is filled in and ready for technical review.</p>
+                <p className="text-sm ink-2">
+                  {assessments.length ? 'Every other value is filled in.' : 'Nothing. Every required procedure is filled in and ready for technical review.'}
+                </p>
               ) : (
                 <>
                   <p className="text-muted-sm">Each answer fills every document that uses it.</p>

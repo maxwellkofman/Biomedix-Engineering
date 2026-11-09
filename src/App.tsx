@@ -2,6 +2,9 @@ import { useEffect, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAccount } from './account/AccountContext';
 import { AppShell } from './components/AppShell';
+import Assessments from './pages/assessments/Assessments';
+import Part11Page from './pages/assessments/Part11';
+import RiskPage from './pages/assessments/Risk';
 import { ButtonLink } from './components/Button';
 import { useIntake } from './intake/IntakeContext';
 import { AcceptInvite, VerifyEmail } from './pages/auth/EmailLinks';
@@ -59,6 +62,9 @@ const TITLES: Record<string, string> = {
   '/app/publish': 'Publish to SharePoint · Biomedix Engineering',
   '/app/readiness': 'Compliance readiness · Biomedix Engineering',
   '/app/history': 'Run history · Biomedix Engineering',
+  '/app/assessments': 'Assessments · Biomedix Engineering',
+  '/app/assessments/part11': 'Part 11 assessment · Biomedix Engineering',
+  '/app/assessments/risk': 'Risk assessment · Biomedix Engineering',
 };
 
 function useRouteChrome() {
@@ -180,6 +186,9 @@ export default function App() {
       <Route path="/app/suite/:docId/history" element={app(<DocHistory />, true)} />
       <Route path="/app/readiness" element={app(<Readiness />)} />
       <Route path="/app/history" element={app(<History />, true)} />
+      <Route path="/app/assessments" element={app(<Assessments />)} />
+      <Route path="/app/assessments/part11" element={app(<Part11Page />)} />
+      <Route path="/app/assessments/risk" element={app(<RiskPage />)} />
       <Route path="/app/projects" element={<Navigate to="/app/dashboard#projects" replace />} />
       <Route path="/app/account" element={<Navigate to="/app/settings/profile" replace />} />
       <Route path="/app/agents" element={app(<ComingSoon title="Agents" />)} />

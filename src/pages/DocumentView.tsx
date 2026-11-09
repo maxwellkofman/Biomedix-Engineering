@@ -104,7 +104,7 @@ export default function DocumentView() {
                   <p key={i}>
                     <Segments segs={b.segs} />
                   </p>
-                ) : (
+                ) : b.kind === 'list' ? (
                   <ul key={i}>
                     {b.items.map((it, j) => (
                       <li key={j}>
@@ -112,6 +112,31 @@ export default function DocumentView() {
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <div key={i} className="table-wrap paper__table-wrap">
+                    <table className="paper__table">
+                      <thead>
+                        <tr>
+                          {b.head.map((h) => (
+                            <th key={h} scope="col">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {b.rows.map((r, j) => (
+                          <tr key={j}>
+                            {r.map((c, k) => (
+                              <td key={k}>
+                                <Segments segs={c} />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ),
               )}
             </section>
@@ -147,6 +172,37 @@ export default function DocumentView() {
       </main>
 
       <aside aria-label="Document status" className="setup-preview">
+        {doc.progress && (
+          <section className="card card--compact" aria-labelledby="assess-h">
+            <h2 id="assess-h" className="card__title card__title--sm">
+              Assessment
+            </h2>
+            <div className="meter" aria-hidden="true">
+              <span className="meter__fill" style={{ width: `${Math.round((doc.progress.done / Math.max(1, doc.progress.total)) * 100)}%` }} />
+            </div>
+            <p className="text-muted-sm">
+              {doc.progress.done} of {doc.progress.total} items done
+              {doc.progress.suggested ? ` · ${doc.progress.suggested} suggestion${doc.progress.suggested > 1 ? 's' : ''} to review` : ''}. This
+              document is written from the {doc.progress.name}.
+            </p>
+            {doc.progress.todo.length > 0 && (
+              <ul className="list-reset stack missing-list">
+                {doc.progress.todo.slice(0, 5).map((t) => (
+                  <li key={t.label}>
+                    <Link to={t.to} className="missing-list__item">
+                      <span>{t.label}</span>
+                      <span className="missing-list__count">Open →</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <ButtonLink to={doc.progress.href} size="sm">
+              Open the {doc.progress.name}
+            </ButtonLink>
+          </section>
+        )}
+
         <section className="card card--compact">
           <h2 className="card__title card__title--sm">Auto-fill</h2>
           <div className="meter" aria-hidden="true">

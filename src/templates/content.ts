@@ -84,7 +84,7 @@ export const CONTENT: Record<string, (Body | undefined)[]> = {
 
   'SOP-003': [
     () =>
-      'Applies to {{device}} across its lifecycle. Intended use: {{intendedUse}}\n\nOne risk management file is kept, owned by {{qualityLead}} with {{engLead}}.',
+      'Applies to {{device}} across its lifecycle. Intended use: {{intendedUse}}\n\nOne risk management file is kept, owned by {{qualityLead}} with {{engLead}}. Hazards, risk estimates, controls and residual risk are recorded in RMF-001 Risk Assessment.',
     undefined,
     (c) =>
       'Severity is rated S1 (negligible) to S5 (catastrophic). Probability is P1 × P2: the probability that a hazardous situation occurs, times the probability that it leads to harm.' +
@@ -115,7 +115,8 @@ export const CONTENT: Record<string, (Body | undefined)[]> = {
       (c.ix.qms.docSystem === 'sharepoint'
         ? '\n\nSharePoint configuration:\n\n- One QMS document library with major and minor (draft) versions and required check-out\n- Columns for document ID, revision, status, owner and effective date\n- Released documents are read-only for everyone except the document control group\n- Superseded revisions move to the Obsolete folder and stay retrievable\n- The Microsoft Purview audit log is retained for the record retention period'
         : '') +
-      '\n\nElectronic signatures are applied with {{eSignature}}. Each signature shows the signer, the date and time, and its meaning (authored, technical review, or approval). {{company}} sends FDA the certification letter required by 21 CFR 11.100(c) before relying on electronic signatures.',
+      '\n\nElectronic signatures are applied with {{eSignature}}. Each signature shows the signer, the date and time, and its meaning (authored, technical review, or approval). {{company}} sends FDA the certification letter required by 21 CFR 11.100(c) before relying on electronic signatures.' +
+      '\n\nEvery system that holds quality records or applies electronic signatures is assessed against Part 11 in FRM-019, with controls set by the risk of its records. FRM-019 is updated before a system is added or its configuration or use changes.',
     () =>
       'Quality records are kept for {{retention}}. Complaint, servicing and UDI records are included under 21 CFR 820.35.',
   ],

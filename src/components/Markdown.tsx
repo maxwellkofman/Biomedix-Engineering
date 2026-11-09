@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 /**
- * Renders the Markdown that docToMarkdown writes (headings, a field table,
- * quotes, lists and paragraphs) as React elements. Text is never parsed as HTML.
+ * Renders the Markdown that docToMarkdown writes (headings, the field table,
+ * data tables, quotes, lists and paragraphs) as React elements. Text is never parsed as HTML.
  */
 export function Markdown({ text }: { text: string }) {
   const out: ReactNode[] = [];
@@ -28,18 +28,44 @@ export function Markdown({ text }: { text: string }) {
         if (!cells.every((c) => /^-+$/.test(c))) rows.push(cells);
         i++;
       }
-      // First row is the header (Field | Value).
-      const body = rows.slice(1);
-      out.push(
-        <dl key={i} className="paper__header md__table">
-          {body.map((r) => (
-            <div key={r[0]} className="deflist__row">
-              <dt>{r[0]}</dt>
-              <dd>{r[1]}</dd>
-            </div>
-          ))}
-        </dl>,
-      );
+      const [head = [], ...body] = rows;
+      if (head.length === 2 && head[0] === 'Field' && head[1] === 'Value')
+        // The document's field table.
+        out.push(
+          <dl key={i} className="paper__header md__table">
+            {body.map((r) => (
+              <div key={r[0]} className="deflist__row">
+                <dt>{r[0]}</dt>
+                <dd>{r[1]}</dd>
+              </div>
+            ))}
+          </dl>,
+        );
+      else
+        out.push(
+          <div key={i} className="table-wrap paper__table-wrap">
+            <table className="paper__table">
+              <thead>
+                <tr>
+                  {head.map((h, k) => (
+                    <th key={k} scope="col">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {body.map((r, k) => (
+                  <tr key={k}>
+                    {r.map((c, j) => (
+                      <td key={j}>{c}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>,
+        );
     } else if (line.startsWith('> ')) {
       out.push(<p key={i} className="md__quote">{line.slice(2)}</p>);
       i++;

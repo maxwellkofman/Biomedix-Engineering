@@ -52,7 +52,9 @@ function itemFromDoc(d: DocReadiness, tokens: TokenValues): QueueItem | null {
     step,
     ref: `${doc.proc.id} · Rev A, draft ${life.latest.draft}`,
     title: `${doc.proc.title}, tailored for ${val('device')}`,
-    summary: `Procedure drafted from ${val('company')}'s setup answers and submitted by the customer. ${life.latest.filledPct}% of values were filled automatically.`,
+    summary: doc.progress
+      ? `${doc.proc.title} completed by ${val('company')} in the ${doc.progress.name} and submitted. ${doc.progress.done} of ${doc.progress.total} items done.`
+      : `Procedure drafted from ${val('company')}'s setup answers and submitted by the customer. ${life.latest.filledPct}% of values were filled automatically.`,
     fields: [
       ['Document', `${doc.proc.id} ${doc.proc.title}`],
       ['Device', val('device')],
@@ -61,6 +63,7 @@ function itemFromDoc(d: DocReadiness, tokens: TokenValues): QueueItem | null {
       ['Approver', val('mgmtRep')],
       ['Sections', String(doc.sections.length)],
       ['Values filled', `${doc.used.length - doc.missing.length} of ${doc.used.length}`],
+      ...(doc.progress ? [['Assessment items', `${doc.progress.done} of ${doc.progress.total}`] as [string, string]] : []),
     ],
     reasoning:
       'Sections follow the Biomedix template for this procedure. Values come from the setup answers; derived values such as safety class and cyber status are proposals until the customer confirms them.',
@@ -69,6 +72,8 @@ function itemFromDoc(d: DocReadiness, tokens: TokenValues): QueueItem | null {
       ['pass', 'All template sections present'] as ['pass', string],
       ...(life.changed ? [['note', 'Customer has changed answers since this draft'] as ['note', string]] : []),
       ...doc.missing.map((k) => ['gap', `${TOKENS[k].label} not provided`] as ['gap', string]),
+      ...(doc.progress?.todo ?? []).slice(0, 5).map((t) => ['gap', t.label] as ['gap', string]),
+      ...(doc.progress?.suggested ? [['note', `${doc.progress.suggested} agent suggestions not confirmed by the customer`] as ['note', string]] : []),
       ...derivedUsed.slice(0, 3).map((k) => ['note', `${TOKENS[k].label} derived by the agent, not confirmed`] as ['note', string]),
     ],
   };

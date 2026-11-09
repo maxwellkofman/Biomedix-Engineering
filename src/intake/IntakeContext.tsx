@@ -17,6 +17,7 @@ import { docHref, missingHref } from '../lib/links';
 import { buildSuite, docToMarkdown, type Suite } from '../templates/generate';
 import { derive, resolveTokens, type Derived, type TokenKey, type TokenValues } from './derive';
 import { EMPTY_INTAKE, EXAMPLE_INTAKE, type Intake, type IntakeSection } from './model';
+import { normalizePart11, normalizeRisk } from '../assessments/model';
 
 const GUEST_KEY = 'biomedix.intake.v1';
 const activeKey = (userId: string, orgId: string) => `biomedix.project.${userId}.${orgId}`;
@@ -25,8 +26,11 @@ const activeKey = (userId: string, orgId: string) => `biomedix.project.${userId}
 export function mergeIntake(partial: Partial<Intake> | undefined): Intake {
   const intake = { ...EMPTY_INTAKE } as Intake;
   for (const k of Object.keys(EMPTY_INTAKE) as IntakeSection[]) {
+    if (k === 'part11' || k === 'risk') continue;
     Object.assign(intake, { [k]: { ...EMPTY_INTAKE[k], ...(partial?.[k] ?? {}) } });
   }
+  intake.part11 = normalizePart11(partial?.part11);
+  intake.risk = normalizeRisk(partial?.risk);
   return intake;
 }
 

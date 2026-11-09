@@ -1,4 +1,4 @@
-export type TierKey = 't1' | 't2' | 't3' | 'sw';
+export type TierKey = 't1' | 't2' | 't3' | 'sw' | 'as';
 
 export interface ProcedureSection {
   /** Section title */
@@ -27,13 +27,15 @@ export const AGENT_FOR_PROCEDURE: Record<string, string> = {
   'SOP-003': 'Risk agent', 'SOP-004': 'CAPA agent', 'SOP-005': 'Trace agent', 'SOP-006': 'CAPA agent', 'SOP-007': 'CAPA agent',
   'SOP-008': 'Trace agent', 'SOP-009': 'Trace agent', 'SOP-010': 'Submission agent', 'SOP-011': 'CAPA agent', 'SOP-012': 'CAPA agent',
   'SOP-013': 'Submission agent', 'SOP-014': 'Trace agent', 'SOP-015': 'Trace agent',
-  'SW-SOP-001': 'Design controls agent', 'SW-SOP-002': 'Risk agent', 'SW-SOP-003': 'Change agent', 'S1–S8': 'Submission agent'
+  'SW-SOP-001': 'Design controls agent', 'SW-SOP-002': 'Risk agent', 'SW-SOP-003': 'Change agent', 'S1–S8': 'Submission agent',
+  'FRM-019': 'Trace agent', 'RMF-001': 'Risk agent'
 };
 export const TIERS: { key: TierKey; name: string }[] = [
   { key: 't1', name: 'FOUNDATION · BEFORE DESIGN WORK' },
   { key: 't2', name: 'OPERATE · BEFORE VERIFICATION' },
   { key: 't3', name: 'MARKET · BEFORE DISTRIBUTION' },
-  { key: 'sw', name: 'SaMD AND AI' }
+  { key: 'sw', name: 'SaMD AND AI' },
+  { key: 'as', name: 'ASSESSMENTS · KEPT CURRENT THROUGH THE LIFECYCLE' }
 ];
 function S(t: string, d: string): ProcedureSection {
   return { t, d };
@@ -44,7 +46,7 @@ export const PROCEDURES: Procedure[] = [
     records: ['Signed quality policy', 'Regulatory requirements matrix', 'Outsourced process register'], creates: ['Quality objective'], checks: ['Every FDA-specific requirement has an owning SOP', 'Quality objectives have a measure and a target'] },
   { g: 't1', id: 'SOP-001', title: 'Document and Record Control', basis: 'ISO 13485 4.2.4, 4.2.5; 21 CFR 820.35; Part 11', owner: 'Quality', when: 'Before design work', summary: 'Only approved, current revisions are used, and every quality record stays legible, retrievable and protected from change.',
     sections: [S('Purpose and scope', 'Paper and electronic documents and records'), S('Document numbering', 'QM, SOP, WI, FRM, SPEC, DHF and RMF prefixes; lettered revisions'), S('Creating and approving documents', 'Author, independent reviewer, process owner and Quality approval'), S('Changing documents', 'Change request with impact on product, risk, training and filings'), S('External documents', 'Standards and regulations register, checked on a set interval'), S('Electronic records and signatures', 'Part 11 controls, signature linking and the FDA certification letter'), S('Record retention', 'Includes complaint, servicing and UDI records under 820.35'), S('Forms', 'Change request, master list, external document register')],
-    records: ['FRM-001 Document Change Request', 'FRM-002 Master Document List', 'FRM-003 External Document Register'], creates: ['Document', 'Change request'], checks: ['Released document cites an obsolete revision', 'Record changed without an audit trail'] },
+    records: ['FRM-001 Document Change Request', 'FRM-002 Master Document List', 'FRM-003 External Document Register', 'FRM-019 21 CFR Part 11 Assessment'], creates: ['Document', 'Change request'], checks: ['Released document cites an obsolete revision', 'Record changed without an audit trail'] },
   { g: 't1', id: 'SOP-002', title: 'Design and Development Control', basis: 'ISO 13485 7.3; 21 CFR 820.10(c)', owner: 'Engineering', when: 'Before design inputs are set', summary: 'Every project runs through planned, reviewed phases, and every design output traces back to an input and forward to verification evidence.',
     sections: [S('Purpose and scope', 'New devices, design changes and IDE builds'), S('Phases and gates', 'Gate zero, planning, inputs, outputs, freeze, verification, validation, transfer, release'), S('Design reviews', 'Functions concerned, recorded findings, actions closed before the next gate'), S('Essential design outputs', 'Outputs flagged as essential for safe and proper use'), S('Verification and validation', 'Protocols first, sample-size rationale, connected-use configurations, human factors'), S('Design changes', 'Impact review and documented 510(k) change assessment'), S('Design and development file', 'One file per project with an index of records')],
     records: ['DHF-T1 to T7', 'WI-001 Regulatory strategy and change assessment', 'WI-002 Statistical techniques'], creates: ['User need', 'Design input', 'Design output', 'Verification', 'Validation', 'Design change'], checks: ['Design input with no verification', 'Output not traced to an input', 'Test run on a superseded build'] },
@@ -53,7 +55,7 @@ export const PROCEDURES: Procedure[] = [
     records: ['DHF-[project]-NNN records'], creates: ['User need', 'Design input', 'Design review', 'Verification'], checks: ['Missing sample-size rationale', 'Verification cites overdue equipment'] },
   { g: 't1', id: 'SOP-003', title: 'Risk Management', basis: 'ISO 14971:2019; ISO/TR 24971', owner: 'Quality and Engineering', when: 'Before design inputs are frozen', summary: 'Hazards are identified top-down, risks estimated and controlled, and overall residual risk judged against benefit across the whole lifecycle.',
     sections: [S('Purpose and scope', 'Design inputs through post-market; one risk management file per project'), S('Process', 'Plan, analyze, evaluate, control, residual risk, report, post-production'), S('Severity and probability scales', 'P1 for the hazardous situation times P2 for harm; software failure set to P1 = 1'), S('Risk acceptability matrix', 'Implements the risk management policy in QM-001'), S('Risk management plan', 'Scope, responsibilities, criteria, verification, review points'), S('Hazard analysis and FMEAs', 'HAZ records fed by design, use and process FMEAs'), S('Risk control verification', 'Implementation and effectiveness, risks introduced by controls'), S('Overall residual risk', 'Method, benefit-risk, disclosure in labeling'), S('Risk management review and report', 'Approved before release')],
-    records: ['Risk management plan', 'Hazard analysis', 'dFMEA, uFMEA, pFMEA', 'Risk management report'], creates: ['Hazard', 'Risk control'], checks: ['Risk control without verification of effectiveness', 'Hazard with no control decision'] },
+    records: ['Risk management plan', 'RMF-001 Risk Assessment (hazard analysis and risk register)', 'dFMEA, uFMEA, pFMEA', 'Risk management report'], creates: ['Hazard', 'Risk control'], checks: ['Risk control without verification of effectiveness', 'Hazard with no control decision'] },
   { g: 't1', id: 'SOP-004', title: 'Supplier and Purchasing Controls', basis: 'ISO 13485 4.1.5, 7.4', owner: 'Operations and Quality', when: 'Before the first critical purchase', summary: 'Suppliers are approved before use, with controls proportional to how much they can affect safety and performance.',
     sections: [S('Purpose and scope', 'Components, contract manufacturing, testing, software, cloud, model and data vendors'), S('Supplier classification', 'Critical, major, minor with minimum qualification'), S('Process', 'Evaluate, approve, purchase with change notice, verify, monitor'), S('Supplier corrective action', 'SCAR route into nonconformance and CAPA'), S('Approved supplier list', 'Scope, basis, status and next review'), S('Supplier evaluation form', 'Certifications, method, findings, quality agreement')],
     records: ['FRM-004 Supplier Evaluation', 'FRM-005 Approved Supplier List'], creates: ['Supplier'], checks: ['Critical supplier with no quality agreement', 'Supplier review overdue'] },
@@ -87,7 +89,7 @@ export const PROCEDURES: Procedure[] = [
     records: ['FRM-016 Labeling Inspection Record'], creates: ['Labeling item'], checks: ['Release with no UDI recorded'] },
   { g: 't2', id: 'SOP-014', title: 'QMS Software Validation', basis: 'ISO 13485 4.1.6; FDA CSA guidance (Feb 2026)', owner: 'Quality', when: 'Before any tool holds QMS records', summary: 'Every production and QMS tool is listed, its intended use stated, its risk rated, and assurance applied in proportion.',
     sections: [S('Scope', 'eQMS, trackers, CI, spreadsheets, AI drafting tools'), S('Inventory and intended use', 'Feature by feature where risk differs'), S('Risk determination', 'High process risk or not'), S('Assurance activities', 'Scripted, unscripted, vendor evidence'), S('Software assurance record', 'FRM-017')],
-    records: ['FRM-017 Software Assurance Record', 'Software register'], creates: ['Tool'], checks: ['Tool in use with no assurance record'] },
+    records: ['FRM-017 Software Assurance Record', 'Software register', 'FRM-019 21 CFR Part 11 Assessment'], creates: ['Tool'], checks: ['Tool in use with no assurance record'] },
   { g: 't2', id: 'SOP-015', title: 'Monitoring and Measuring Equipment', basis: 'ISO 13485 7.6', owner: 'Engineering', when: 'Before design verification', summary: 'Equipment that decides acceptance is calibrated against traceable standards, and out-of-tolerance findings reopen prior results.',
     sections: [S('Register', 'Range, accuracy needed and interval'), S('Calibration and traceability', 'Traceable to national standards; status labels'), S('Out of tolerance', 'NC plus impact on prior results'), S('Equipment register', 'FRM-018')],
     records: ['FRM-018 Equipment Register'], creates: ['Equipment'], checks: ['Test cites overdue equipment'] },
@@ -113,7 +115,14 @@ export const PROCEDURES: Procedure[] = [
     records: ['S6 Data Management Plan and Model Card', 'S7 PCCP'], creates: ['Dataset', 'Model version'], checks: ['Test set accessed before protocol approval', 'Subgroup below acceptance criteria'] },
   { g: 'sw', id: 'S1–S8', title: 'Software Design File Templates', basis: 'IEC 62304; FDA software and AI guidances', owner: 'Engineering', when: 'Through the software project', summary: 'Eight fill-in records that join DHF-T1 to T7 for software-driven devices.',
     sections: [S('S1 Software development plan', 'Lifecycle, tools, configuration, verification'), S('S2 Software requirements', 'Risk-control flag and verification link'), S('S3 Architecture and SOUP list', 'Items, interfaces, segregation'), S('S4 Regulatory determination', 'Device status, pathway, 524B, AI, documentation level'), S('S5 Anomaly list', 'Risk rationale for release'), S('S6 Data management and model card', 'Datasets, performance, limitations'), S('S7 PCCP', 'Planned modifications and protocol'), S('S8 Threat model and SBOM', 'STRIDE threats linked to hazards')],
-    records: ['DHF-[project]-S1 to S8'], creates: ['Software requirement', 'Threat', 'Model version'], checks: ['Requirement with no test link'] }
+    records: ['DHF-[project]-S1 to S8'], creates: ['Software requirement', 'Threat', 'Model version'], checks: ['Requirement with no test link'] },
+
+  { g: 'as', id: 'FRM-019', title: '21 CFR Part 11 Assessment', basis: '21 CFR Part 11; FDA Part 11 Scope and Application guidance (2003); ISO 13485 4.1.6, 4.2.5', owner: 'Quality', when: 'Before a system holds quality records or signatures', summary: 'Each system that holds quality records or applies electronic signatures is checked against Part 11, with controls set by the risk of its records and a corrective action for every gap.',
+    sections: [S('Scope and approach', 'Predicate rules, reliance, and the risk-based approach'), S('Systems and scope', 'Inventory with the scope decision and risk for each system'), S('Company-wide controls', 'Training, accountability policy, identity checks, FDA certification letter'), S('Each system in scope', 'Record controls 11.10 and 11.30; signature controls 11.50 to 11.300'), S('Findings and corrective actions', 'Owner and due date for every gap; risk acceptances'), S('Conclusion', 'Overall result and review triggers')],
+    records: ['FRM-019 21 CFR Part 11 Assessment', 'FRM-017 Software Assurance Record'], creates: ['Part 11 finding'], checks: ['System holds signed records with no Part 11 assessment', 'Gap with no corrective action', 'Electronic signatures relied on before the 11.100(c) letter'] },
+  { g: 'as', id: 'RMF-001', title: 'Risk Assessment', basis: 'ISO 14971:2019 clauses 5–8; ISO/TR 24971:2020', owner: 'Quality and Engineering', when: 'Before design inputs are frozen; updated through the lifecycle', summary: 'Hazards are identified for the device, each risk estimated and evaluated against the SOP-003 matrix, controlled and verified, and residual risk judged on its own and overall.',
+    sections: [S('Scope', 'Device, intended use, users and lifecycle'), S('Risk acceptability criteria', 'Severity and probability scales and the matrix'), S('Hazard identification', 'Method and hazards by category'), S('Risk estimation and evaluation', 'Sequence of events, hazardous situation, harm, severity, probability'), S('Risk control and verification', 'Control priority, implementation and effectiveness evidence'), S('Residual risk evaluation', 'Risk after control, new hazards, benefit-risk'), S('Overall residual risk', 'Method, benefits, disclosure and decision'), S('Open items and review notes', 'What is left and reviewer notes')],
+    records: ['RMF-001 Risk Assessment', 'Risk management report'], creates: ['Hazard', 'Risk control'], checks: ['Risk control without verification of effectiveness', 'Hazard with no control decision', 'Residual risk not acceptable with no benefit-risk rationale'] }
 ];
 
 /** The expert-service line shown under the sign-off path for a procedure. */
@@ -123,5 +132,7 @@ export function reviewOfferFor(id: string): string {
     return 'Available: independent reviewer at each design review, plus technical review of this document.';
   if (id === 'SOP-012')
     return 'Available: technical review of the record. Management review itself stays with your top management.';
+  if (id === 'FRM-019') return 'Available: a Biomedix engineer checks each system’s evidence against Part 11 before signing the technical review.';
+  if (id === 'RMF-001') return 'Available: an independent engineer challenges the hazard list and severity ratings at technical review.';
   return 'Every agent output gets a Biomedix technical review before it goes to your approvers.';
 }

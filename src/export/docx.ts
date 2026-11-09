@@ -51,6 +51,28 @@ function keyValueTable(d: Docx, rows: [string, InstanceType<Docx['TextRun']>[]][
   });
 }
 
+/** A table of assessment data. Wide tables use a smaller font so they fit a portrait page. */
+function dataTable(d: Docx, head: string[], rows: Segment[][][], tokens: TokenValues, widths?: number[]) {
+  const size = head.length > 5 ? 16 : 18;
+  const w = (i: number) => widths?.[i] ?? Math.floor(100 / head.length);
+  return new d.Table({
+    width: { size: 100, type: d.WidthType.PERCENTAGE },
+    rows: [
+      new d.TableRow({
+        tableHeader: true,
+        children: head.map((h, i) => cell(d, [textPara(d, h, { bold: true, size })], { width: w(i), shade: true })),
+      }),
+      ...rows.map(
+        (r) =>
+          new d.TableRow({
+            cantSplit: true,
+            children: r.map((c, i) => cell(d, [new d.Paragraph({ children: runs(d, c, tokens, { size }) })], { width: w(i) })),
+          }),
+      ),
+    ],
+  });
+}
+
 function signatureTable(d: Docx, tokens: TokenValues) {
   const head = ['Signature meaning', 'Name and title', 'Signature', 'Date'];
   const approver = tokens.mgmtRep?.value ?? '[Management representative]';
@@ -148,7 +170,11 @@ export async function docToDocx(doc: GeneratedDoc, tokens: TokenValues): Promise
     children.push(new d.Paragraph({ heading: d.HeadingLevel.HEADING_1, children: [new d.TextRun(`${Number(s.n)}. ${s.title}`)] }));
     for (const b of s.blocks) {
       if (b.kind === 'p') children.push(new d.Paragraph({ children: runs(d, b.segs, tokens) }));
-      else b.items.forEach((it) => children.push(new d.Paragraph({ bullet: { level: 0 }, children: runs(d, it, tokens) })));
+      else if (b.kind === 'list') b.items.forEach((it) => children.push(new d.Paragraph({ bullet: { level: 0 }, children: runs(d, it, tokens) })));
+      else {
+        children.push(dataTable(d, b.head, b.rows, tokens, b.widths));
+        children.push(new d.Paragraph({ children: [] }));
+      }
     }
   }
 

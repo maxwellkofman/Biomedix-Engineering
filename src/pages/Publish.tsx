@@ -17,6 +17,7 @@ import {
   type Session,
 } from '../export/sharepoint';
 import { buildTree, countTree, type QmsFolder } from '../export/structure';
+import { openItems } from '../templates/generate';
 import '../styles/app.css';
 import '../styles/flow.css';
 
@@ -56,8 +57,8 @@ function Tree({ folder, depth = 0 }: { folder: QmsFolder; depth?: number }) {
         <li key={file.name} className="tree__file">
           <DocIcon />
           <span className="tree__name">{file.name}</span>
-          {file.kind === 'doc' && file.doc.missing.length > 0 && (
-            <span className="status status--input">{file.doc.missing.length} to fill</span>
+          {file.kind === 'doc' && openItems(file.doc) > 0 && (
+            <span className="status status--input">{openItems(file.doc)} to fill</span>
           )}
         </li>
       ))}

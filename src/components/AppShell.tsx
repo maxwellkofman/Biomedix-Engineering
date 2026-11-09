@@ -12,6 +12,7 @@ import '../styles/org.css';
 const NAV = [
   { label: 'Review queue', to: '/app/review' },
   { label: 'Documentation', to: '/app/suite', also: ['/app/setup', '/app/form', '/app/publish', '/app/history', '/app/readiness'] },
+  { label: 'Assessments', to: '/app/assessments' },
   { label: 'Agents', to: '/app/agents' },
   { label: 'Trace graph', to: '/app/trace' },
   { label: 'Gates', to: '/app/gates' },

@@ -11,6 +11,9 @@ import { getDb, tx } from '../db.ts';
 import { HttpError, now, obj, route, str, type Ctx, type Json, type Route } from '../http.ts';
 import { reauth } from './account.ts';
 
+/** Answers include the two assessments, so they can be larger than other JSON fields. */
+const INTAKE_MAX = 800_000;
+
 function readiness(body: Json): number | undefined {
   const v = body.readiness;
   if (v === undefined) return undefined;
@@ -116,7 +119,7 @@ export function createProject(c: Ctx, orgId: string) {
   if (n >= 100) throw new HttpError(400, 'A company can have up to 100 projects.');
   const id = randomUUID();
   const t = now();
-  const intake = obj(c.body, 'intake') ?? {};
+  const intake = obj(c.body, 'intake', INTAKE_MAX) ?? {};
   getDb()
     .prepare(
       'INSERT INTO projects (id, org_id, created_by, intake, confirmed, readiness, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -131,7 +134,7 @@ export const projectRoutes: Route[] = [
 
   route('PUT', '/projects/:id', (c) => {
     const { row } = projectAccess(c.user, c.params.id, 'edit');
-    const intake = obj(c.body, 'intake');
+    const intake = obj(c.body, 'intake', INTAKE_MAX);
     const confirmed = obj(c.body, 'confirmed');
     const r = readiness(c.body);
     const t = now();
@@ -152,7 +155,7 @@ export const projectRoutes: Route[] = [
 
   route('POST', '/projects/:id/runs', (c) => {
     const { row } = projectAccess(c.user, c.params.id, 'edit');
-    const intake = obj(c.body, 'intake');
+    const intake = obj(c.body, 'intake', INTAKE_MAX);
     if (!intake) throw new HttpError(400, 'intake is required.');
     const confirmed = obj(c.body, 'confirmed');
     const score = readiness(c.body) ?? 0;

@@ -1,4 +1,9 @@
-/** Everything the customer tells us during setup. All values are strings so the form stays simple. */
+import { EMPTY_PART11, EMPTY_RISK, type Part11Answers, type RiskAnswers } from '../assessments/model';
+
+/**
+ * Everything the customer tells us: setup answers (all strings, so the form
+ * stays simple) and the two assessments, which have their own pages.
+ */
 
 export type YesNo = 'yes' | 'no' | '';
 
@@ -66,6 +71,10 @@ export interface Intake {
     ml: string;
     security: string;
   };
+  /** 21 CFR Part 11 assessment (FRM-019). */
+  part11: Part11Answers;
+  /** ISO 14971 risk assessment (RMF-001). */
+  risk: RiskAnswers;
 }
 
 export type IntakeSection = keyof Intake;
@@ -118,6 +127,8 @@ export const EMPTY_INTAKE: Intake = {
     complaintChannels: '',
   },
   team: { ceo: '', managementRep: '', quality: '', engineering: '', operations: '', regulatory: '', ml: '', security: '' },
+  part11: EMPTY_PART11,
+  risk: EMPTY_RISK,
 };
 
 /**
@@ -191,6 +202,8 @@ export const EXAMPLE_INTAKE: Intake = {
     ml: 'Priya Shah, ML Lead',
     security: '',
   },
+  part11: EMPTY_PART11,
+  risk: EMPTY_RISK,
 };
 
 export type StepId = 'company' | 'device' | 'technology' | 'regulatory' | 'operations' | 'quality' | 'team';

@@ -2,11 +2,16 @@ import { PROCEDURES, TIERS, type Procedure } from '../data/procedures';
 import { TOKENS, type Derived, type TokenKey, type TokenValues } from '../intake/derive';
 import type { Intake } from '../intake/model';
 import { CONTENT, type TemplateCtx } from './content';
+import { ASSESSMENT_DOCS } from '../assessments/docs';
 
 /* ---------- Output shapes ---------- */
 
 export type Segment = { kind: 'text'; text: string } | { kind: 'token'; key: TokenKey };
-export type Block = { kind: 'p'; segs: Segment[] } | { kind: 'list'; items: Segment[][] };
+export type Block =
+  | { kind: 'p'; segs: Segment[] }
+  | { kind: 'list'; items: Segment[][] }
+  /** Column headings, then rows of cells. widths are percentages for Word. */
+  | { kind: 'table'; head: string[]; rows: Segment[][][]; widths?: number[] };
 
 export interface GeneratedSection {
   n: string;
@@ -16,6 +21,19 @@ export interface GeneratedSection {
 }
 
 export type DocStatus = 'ready' | 'input' | 'na';
+
+/** For documents built from an assessment rather than from setup answers alone. */
+export interface DocProgress {
+  done: number;
+  total: number;
+  /** Agent suggestions not yet confirmed, out of all made. */
+  suggested: number;
+  suggestedTotal: number;
+  todo: { label: string; to: string }[];
+  /** The assessment page. */
+  href: string;
+  name: string;
+}
 
 export interface GeneratedDoc {
   proc: Procedure;
@@ -32,7 +50,11 @@ export interface GeneratedDoc {
   used: TokenKey[];
   missing: TokenKey[];
   filledPct: number;
+  progress?: DocProgress;
 }
+
+/** Open items in a document: missing values plus unfinished assessment items. */
+export const openItems = (doc: GeneratedDoc) => doc.missing.length + (doc.progress ? doc.progress.total - doc.progress.done : 0);
 
 export interface Suite {
   docs: GeneratedDoc[];
@@ -161,15 +183,18 @@ export function buildSuite(ix: Intake, d: Derived, tokens: TokenValues): Suite {
     const ctx: TemplateCtx = { ix, d, applicable: applicableProcs, excluded, owner: `{{${owner}}}` };
     const bodies = CONTENT[p.id] ?? [];
 
-    const sections = p.sections.map((s, i) => {
-      const body = bodies[i]?.(ctx) ?? genericBody(s.d);
-      return {
-        n: String(i + 1).padStart(2, '0'),
-        title: s.t,
-        purpose: s.d,
-        blocks: parseBlocks(body.replace(/OWNER/g, `{{${owner}}}`)),
-      };
-    });
+    const built = ASSESSMENT_DOCS[p.id]?.({ ix, d, tpl: parseSegments, tplBlocks: parseBlocks });
+    const sections =
+      built?.sections.map((s, i) => ({ ...s, n: String(i + 1).padStart(2, '0') })) ??
+      p.sections.map((s, i) => {
+        const body = bodies[i]?.(ctx) ?? genericBody(s.d);
+        return {
+          n: String(i + 1).padStart(2, '0'),
+          title: s.t,
+          purpose: s.d,
+          blocks: parseBlocks(body.replace(/OWNER/g, `{{${owner}}}`)),
+        };
+      });
 
     const header: [string, Segment[]][] = [
       ['Document', parseSegments(`${p.id} ${p.title}`)],
@@ -184,15 +209,21 @@ export function buildSuite(ix: Intake, d: Derived, tokens: TokenValues): Suite {
     const used = new Set<TokenKey>();
     const collect = (segs: Segment[]) => segs.forEach((s) => s.kind === 'token' && used.add(s.key));
     header.forEach(([, segs]) => collect(segs));
-    sections.forEach((s) => s.blocks.forEach((b) => (b.kind === 'p' ? collect(b.segs) : b.items.forEach(collect))));
+    sections.forEach((s) =>
+      s.blocks.forEach((b) =>
+        b.kind === 'p' ? collect(b.segs) : b.kind === 'list' ? b.items.forEach(collect) : b.rows.forEach((r) => r.forEach(collect)),
+      ),
+    );
     const usedList = [...used];
     const missing = usedList.filter((k) => !isFilled(tokens, k));
-    const filledPct = usedList.length ? Math.round(((usedList.length - missing.length) / usedList.length) * 100) : 100;
+    const progress = built?.progress;
+    const parts = usedList.length + (progress?.total ?? 0);
+    const filledPct = parts ? Math.round(((usedList.length - missing.length + (progress?.done ?? 0)) / parts) * 100) : 100;
 
     return {
       proc: p,
       tierName,
-      status: !a.applies ? 'na' : missing.length ? 'input' : 'ready',
+      status: !a.applies ? 'na' : missing.length || (progress && progress.done < progress.total) ? 'input' : 'ready',
       reason: a.reason,
       pending: a.pending,
       ownerToken: owner,
@@ -201,12 +232,13 @@ export function buildSuite(ix: Intake, d: Derived, tokens: TokenValues): Suite {
       used: usedList,
       missing,
       filledPct,
+      progress,
     };
   });
 
   const applicable = docs.filter((x) => x.status !== 'na');
-  const totalUsed = applicable.reduce((n, x) => n + x.used.length, 0);
-  const totalMissing = applicable.reduce((n, x) => n + x.missing.length, 0);
+  const totalUsed = applicable.reduce((n, x) => n + x.used.length + (x.progress?.total ?? 0), 0);
+  const totalMissing = applicable.reduce((n, x) => n + x.missing.length + (x.progress ? x.progress.total - x.progress.done : 0), 0);
 
   const missingMap = new Map<TokenKey, string[]>();
   applicable.forEach((doc) => doc.missing.forEach((k) => missingMap.set(k, [...(missingMap.get(k) ?? []), doc.proc.id])));
@@ -257,8 +289,13 @@ export function docToMarkdown(doc: GeneratedDoc, tokens: TokenValues): string {
     out.push(`## ${s.n}. ${s.title}`, '');
     s.blocks.forEach((b) => {
       if (b.kind === 'p') out.push(segsToText(b.segs, tokens), '');
-      else {
+      else if (b.kind === 'list') {
         b.items.forEach((it) => out.push(`- ${segsToText(it, tokens)}`));
+        out.push('');
+      } else {
+        const cell = (t: string) => t.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ') || ' ';
+        out.push(`| ${b.head.map(cell).join(' | ')} |`, `| ${b.head.map(() => '---').join(' | ')} |`);
+        b.rows.forEach((r) => out.push(`| ${r.map((c) => cell(segsToText(c, tokens))).join(' | ')} |`));
         out.push('');
       }
     });

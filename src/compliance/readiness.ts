@@ -121,11 +121,14 @@ export interface Readiness {
 
 export function scoreDoc(doc: GeneratedDoc, tokens: TokenValues, life: DocLifecycle): DocReadiness {
   const pendingPenalty = doc.pending ? 1 : 0;
-  const total = doc.used.length + pendingPenalty;
-  const filled = total ? (doc.used.length - doc.missing.length) / total : 1;
+  // Assessment documents also count their checklist items and the agent's suggestions.
+  const pr = doc.progress;
+  const total = doc.used.length + pendingPenalty + (pr?.total ?? 0);
+  const filled = total ? (doc.used.length - doc.missing.length + (pr?.done ?? 0)) / total : 1;
   const derived = doc.used.filter((k) => tokens[k]?.auto && isFilled(tokens, k));
   const unconfirmed = derived.filter((k) => !tokens[k]?.confirmed);
-  const confirmed = derived.length ? (derived.length - unconfirmed.length) / derived.length : 1;
+  const proposals = derived.length + (pr?.suggestedTotal ?? 0);
+  const confirmed = proposals ? (proposals - unconfirmed.length - (pr?.suggested ?? 0)) / proposals : 1;
   const current = !life.changed;
   const reviewed = current && !!life.review;
   const approved = current && !!life.approval;
@@ -224,6 +227,20 @@ export function computeReadiness(
       to: `/app/setup/${pendingStep(q)}`,
     }),
   );
+  docs
+    .filter((d) => d.doc.progress && (d.doc.progress.done < d.doc.progress.total || d.doc.progress.suggested))
+    .forEach(({ doc }) => {
+      const pr = doc.progress!;
+      const left = pr.total - pr.done;
+      next.push({
+        key: `assess-${doc.proc.id}`,
+        title: `${pr.done ? 'Finish' : 'Start'} the ${pr.name}`,
+        detail: [left && `${plural(left, 'item')} left`, pr.suggested && `${plural(pr.suggested, 'suggestion')} to review`]
+          .filter(Boolean)
+          .join(' · ') + ` · fills ${doc.proc.id}`,
+        to: pr.href,
+      });
+    });
   if (proposals.length)
     next.push({
       key: 'confirm',
