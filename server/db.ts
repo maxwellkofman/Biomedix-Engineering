@@ -294,6 +294,37 @@ const MIGRATIONS: (string | ((d: DatabaseSync) => void))[] = [
   );
   CREATE INDEX gap_findings_scan ON gap_findings(scan_id, position);
   `,
+
+  // v4: questions from a company to Biomedix engineers ("Ask an engineer").
+  `
+  CREATE TABLE help_threads (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    asker TEXT NOT NULL,
+    asker_email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    context TEXT NOT NULL DEFAULT '',
+    context_label TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL CHECK (status IN ('open', 'answered', 'closed')),
+    answered_by TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX help_threads_org ON help_threads(org_id, updated_at);
+  CREATE INDEX help_threads_status ON help_threads(status, updated_at);
+  CREATE TABLE help_messages (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES help_threads(id) ON DELETE CASCADE,
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    author TEXT NOT NULL,
+    staff INTEGER NOT NULL DEFAULT 0,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX help_messages_thread ON help_messages(thread_id, created_at);
+  `,
 ];
 
 let db: DatabaseSync | null = null;

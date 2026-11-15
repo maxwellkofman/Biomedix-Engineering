@@ -1,4 +1,4 @@
-import { EMPTY_PART11, EMPTY_RISK, type Part11Answers, type RiskAnswers } from '../assessments/model';
+import { EMPTY_PART11, EMPTY_RISK, type Part11Answers, type RiskAnswers } from '../assessments/model.ts';
 
 /**
  * Everything the customer tells us: setup answers (all strings, so the form

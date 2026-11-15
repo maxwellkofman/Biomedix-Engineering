@@ -1,5 +1,6 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ReadinessRing, StageTag } from '../components/Lifecycle';
+import { StageTag } from '../components/Lifecycle';
+import { Popover } from '../components/Popover';
 import { AppShell } from '../components/AppShell';
 import { Button, ButtonLink } from '../components/Button';
 import { missingHref, Segments } from '../components/Segments';
@@ -10,6 +11,8 @@ import { downloadText, openItems, suiteToMarkdown, type GeneratedDoc } from '../
 import { docHref } from '../lib/links';
 import '../styles/app.css';
 import '../styles/flow.css';
+import '../styles/org.css';
+import '../styles/clean.css';
 
 export { docHref };
 
@@ -29,27 +32,14 @@ export default function Suite() {
     return (
       <AppShell>
         <main className="app-main suite-empty">
-          <span className="eyebrow">DOCUMENTATION SUITE</span>
-          <h1 className="setup-main__title">Answer a few questions. Get every required procedure, drafted.</h1>
+          <span className="eyebrow">DOCUMENTS</span>
+          <h1 className="setup-main__title">No documents yet.</h1>
           <p className="setup-main__blurb">
-            Tell us about your company, device and team. The agents work out which procedures FDA expects for your
-            device and fill in everything they can. You review what's left.
+            Describe your device and the agent drafts every procedure and assessment it needs. You answer what it can’t work out; an engineer
+            reviews the result.
           </p>
-          <div className="mode-grid">
-            <Link to="/app/form" className="card mode-card">
-              <span className="eyebrow">SINGLE FORM</span>
-              <span className="mode-card__title">Answer one questionnaire</span>
-              <span className="card__body">
-                Every question on one page, each showing which documents it fills. Best if you have the details to hand.
-              </span>
-              <span className="mode-card__go">Open the form →</span>
-            </Link>
-            <Link to="/app/setup/company" className="card mode-card">
-              <span className="eyebrow">GUIDED</span>
-              <span className="mode-card__title">Go step by step</span>
-              <span className="card__body">Seven short steps with a live preview of your suite as you answer.</span>
-              <span className="mode-card__go">Start setup →</span>
-            </Link>
+          <div className="button-row">
+            <ButtonLink to="/app/start">Describe your device</ButtonLink>
           </div>
           <div className="button-row">
             <Button
@@ -77,31 +67,45 @@ export default function Suite() {
       <main className="app-main suite-main">
         <div className="suite-head">
           <div className="stack suite-head__copy">
-            <span className="eyebrow">DOCUMENTATION SUITE</span>
-            <h1 className="setup-main__title">Procedures and records for {company}</h1>
-            <p className="setup-main__blurb">
-              Highlighted values come from your setup answers. Dashed ones were derived by the agent — confirm them.
-              Amber items still need input.
+            <span className="eyebrow">DOCUMENTS</span>
+            <h1 className="setup-main__title">Documents for {company}</h1>
+            <p className="suite-line">
+              {suite.applicable.length} drafted · {suite.needsInput ? `${suite.needsInput} need input` : 'none need input'} ·{' '}
+              {readiness.counts.approved} approved
+              {suite.notApplicable ? ` · ${suite.notApplicable} not needed for your device` : ''}
             </p>
           </div>
           <div className="button-row">
-            <ButtonLink to="/app/form" variant="outline">
-              Edit answers
-            </ButtonLink>
-            {mode === 'account' && (
-              <ButtonLink to="/app/history" variant="outline">
-                History{runs.length ? ` · ${runs.length} run${runs.length > 1 ? 's' : ''}` : ''}
-              </ButtonLink>
-            )}
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadText(`${(tokens.company?.value ?? 'qms').replace(/\W+/g, '-')}-documentation-suite.md`, suiteToMarkdown(suite, tokens))
-              }
-            >
-              Export all (.md)
-            </Button>
-            <ButtonLink to="/app/publish">Publish to SharePoint</ButtonLink>
+            <Popover buttonClass="btn btn--outline" label="More" ariaLabel="More actions">
+              {() => (
+                <div className="menu more-menu">
+                  <Link to="/app/form" className="menu__item">
+                    Edit all answers
+                  </Link>
+                  <Link to="/app/readiness" className="menu__item">
+                    Readiness details
+                  </Link>
+                  {mode === 'account' && (
+                    <Link to="/app/history" className="menu__item">
+                      Run history{runs.length ? ` (${runs.length})` : ''}
+                    </Link>
+                  )}
+                  <Link to="/app/procedures" className="menu__item">
+                    Template library
+                  </Link>
+                  <button
+                    type="button"
+                    className="menu__item"
+                    onClick={() =>
+                      downloadText(`${(tokens.company?.value ?? 'qms').replace(/\W+/g, '-')}-documentation-suite.md`, suiteToMarkdown(suite, tokens))
+                    }
+                  >
+                    Export all as Markdown
+                  </button>
+                </div>
+              )}
+            </Popover>
+            <ButtonLink to="/app/publish">Publish or download</ButtonLink>
           </div>
         </div>
 
@@ -145,25 +149,6 @@ export default function Suite() {
           </div>
         )}
 
-        <div className="facts suite-stats">
-          {[
-            ['Compliance readiness', `${readiness.pct}%`],
-            ['Required procedures', String(suite.applicable.length)],
-            ['Auto-filled', `${suite.filledPct}%`],
-            ['Ready for review', String(suite.ready)],
-            ['Need input', String(suite.needsInput)],
-            ['Not applicable', String(suite.notApplicable)],
-          ].map(([k, v]) => (
-            <div key={k} className="facts__cell">
-              <span className="facts__key">{k}</span>
-              <span className="suite-stats__value">{v}</span>
-            </div>
-          ))}
-        </div>
-        <div className="meter meter--lg" aria-label={`${suite.filledPct}% auto-filled`} role="img">
-          <span className="meter__fill" style={{ width: `${suite.filledPct}%` }} />
-        </div>
-
         <div className="suite-grid">
           <div className="stack suite-tiers">
             {TIERS.map((tier) => {
@@ -195,13 +180,11 @@ export default function Suite() {
                             </span>
                           </span>
                           <span className="stack doc-row__status">
-                            <StatusPill doc={doc} />
-                            {doc.status !== 'na' && (
-                              <span className="meter meter--sm" aria-hidden="true">
-                                <span className="meter__fill" style={{ width: `${doc.filledPct}%` }} />
-                              </span>
+                            {mode === 'account' && doc.status !== 'na' && !lives[doc.proc.id]?.changed && !['unsaved', 'draft'].includes(lives[doc.proc.id]?.stage ?? 'unsaved') ? (
+                              <StageTag life={lives[doc.proc.id]} />
+                            ) : (
+                              <StatusPill doc={doc} />
                             )}
-                            {mode === 'account' && doc.status !== 'na' && <StageTag life={lives[doc.proc.id]} />}
                           </span>
                         </Link>
                       </li>
@@ -213,17 +196,6 @@ export default function Suite() {
           </div>
 
           <div className="stack suite-side">
-            <Link to="/app/readiness" className="card card--compact readiness-mini">
-              <ReadinessRing pct={readiness.pct} size={88} />
-              <span className="stack">
-                <span className="card__title card__title--sm">Compliance readiness</span>
-                <span className="text-muted-sm">
-                  {readiness.counts.approved} of {suite.applicable.length} procedures approved ·{' '}
-                  {readiness.requirementsMet} of {readiness.requirementsTotal} requirements met
-                </span>
-                <span className="mode-card__go">See what's left →</span>
-              </span>
-            </Link>
             <section aria-labelledby="missing-h" className="card card--compact">
               <h2 id="missing-h" className="card__title card__title--sm">
                 What's still missing
@@ -267,10 +239,11 @@ export default function Suite() {
               )}
             </section>
 
-            <section aria-labelledby="gate-h" className="card card--night card--compact gate-card">
-              <h2 id="gate-h" className="card__title card__title--sm">
-                Gate zero determination
-              </h2>
+            <details className="card card--compact fold">
+              <summary className="fold__summary">
+                <span className="card__title card__title--sm">What the agent decided about your device</span>
+              </summary>
+              <div className="stack fold__body gate-fold">
               <dl className="gate-card__list">
                 {suite.gateZero.map((g) => (
                   <div key={g.q}>
@@ -281,8 +254,9 @@ export default function Suite() {
                   </div>
                 ))}
               </dl>
-              <p className="gate-card__note">Drafted by the agent. A Biomedix engineer and your team sign it.</p>
-            </section>
+              <p className="text-muted-sm">Drafted by the agent. A Biomedix engineer and your team sign it.</p>
+              </div>
+            </details>
           </div>
         </div>
       </main>

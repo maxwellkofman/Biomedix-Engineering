@@ -22,7 +22,9 @@ export type Template =
   | 'scan-team'
   | 'demo-received'
   | 'scan-received'
-  | 'scan-report';
+  | 'scan-report'
+  | 'help-team'
+  | 'help-reply';
 
 interface Message {
   subject: string;
@@ -83,6 +85,18 @@ function compose(t: Template, v: Record<string, string>): Message {
           ...(v.message ? [`“${v.message}”`] : []),
         ].filter(Boolean),
         action: { label: 'Open in the Biomedix workspace', url: v.url },
+      };
+    case 'help-team':
+      return {
+        subject: `Question from ${v.company}: ${v.subject}`,
+        lines: [`${v.name} at ${v.company} asked an engineer${v.context ? ` (from ${v.context})` : ''}:`, `“${v.body}”`],
+        action: { label: 'Answer in the Biomedix workspace', url: v.url },
+      };
+    case 'help-reply':
+      return {
+        subject: `A Biomedix engineer answered: ${v.subject}`,
+        lines: [`Hi ${v.name},`, `${v.engineer} replied to your question:`, `“${v.body}”`],
+        action: { label: 'Read and reply', url: v.url },
       };
     case 'scan-team':
       return {

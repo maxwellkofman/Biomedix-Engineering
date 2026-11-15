@@ -34,7 +34,7 @@ function Fills({ q }: { q: Question }) {
   );
 }
 
-function QuestionInput({ q, showFills }: { q: Question; showFills?: boolean }) {
+export function QuestionInput({ q, showFills }: { q: Question; showFills?: boolean }) {
   const { intake, update } = useIntake();
   const ctx = useCtx();
   const id = fieldId(q);

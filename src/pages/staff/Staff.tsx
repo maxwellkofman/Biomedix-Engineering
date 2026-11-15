@@ -28,11 +28,17 @@ export function StaffNav() {
   const { user } = useAccount();
   return (
     <nav className="staff-tabs" aria-label="Biomedix">
+      <NavLink to="/staff" end className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
+        Overview
+      </NavLink>
       <NavLink to="/staff/reviews" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
         Technical reviews
       </NavLink>
       <NavLink to="/staff/scans" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
         Gap scans
+      </NavLink>
+      <NavLink to="/staff/questions" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
+        Questions
       </NavLink>
       <NavLink to="/staff/requests" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
         Demo requests

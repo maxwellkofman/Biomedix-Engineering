@@ -52,7 +52,10 @@ In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow
 | `/demo` | Book a demo: a short form, then the scheduler; optionally add files for a gap scan (`/demo?scan=1` starts with it on) |
 | `/gap-scan` | Free gap scan: upload files, with an optional call to walk through the results |
 | `/request/:token` | The requester's private page: pick a demo time, upload files, follow the scan, read and print the report, delete their files |
-| `/app/review` | Review queue (agent outputs waiting on a person) |
+| `/app/dashboard` | Home, signed in or not: one next step with a single button, the six-step path, readiness, and "Ask an engineer". Signed in, it also folds away projects, team and activity |
+| `/app/start` | The guide: describe the device, then one question at a time. It asks only what the agent can't work out |
+| `/app/help` | Ask an engineer: the company's questions to Biomedix staff, with answers |
+| `/app/review` | Reviews (agent outputs waiting on a person) |
 | `/app/procedures` | Procedure library |
 | `/app/form` | QMS questionnaire: every question on one page, each showing the documents it fills |
 | `/app/setup/:step` | Guided setup: the same questions in seven steps |
@@ -65,10 +68,11 @@ In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow
 | `/app/assessments/risk` | ISO 14971 risk assessment: acceptability matrix, hazards, controls, residual and overall risk (writes RMF-001) |
 | `/app/history` | Run history: every saved run, the answers it changed and the documents it revised (account) |
 | `/app/suite/:docId/history` | Revision history of one document: every draft, its sign-offs, and line-by-line changes (account) |
-| `/app/dashboard` | Company dashboard: totals, items that need you, every project's readiness and document pipeline, team, recent activity (account) |
 | `/app/welcome` | Setup checklist after sign-up (account) |
 | `/app/settings/profile` · `security` · `sessions` | Your name and sign-in email; password and two-factor; signed-in devices (account) |
 | `/app/settings/company` · `members` · `activity` | Company name, two-factor policy, leave or delete; members, roles, approvers and invitations; the activity log (account) |
+| `/staff` | Biomedix overview: counts for each queue, the oldest items in each, customer totals, and for admins the newest companies and recent activity (staff) |
+| `/staff/questions` | Questions customers asked an engineer: unanswered, answered, closed (staff) |
 | `/staff/reviews` | Biomedix reviewer workspace: drafts submitted by every company, with changes from the previous draft (staff) |
 | `/staff/admin` | Biomedix admin: every company and person, staff roles, two-factor reset (staff admin) |
 | `/staff/scans`, `/staff/scans/:id` | Gap scan queue with due times; one scan's files, automated findings to keep, edit or dismiss, your own findings, summary and send (staff) |
@@ -87,6 +91,17 @@ In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow
 4. **Review**: filled values are highlighted, derived values dashed, missing ones link straight to the setup field. Documents export as Markdown or print to PDF, and *Submit for technical review* puts them in the review queue.
 
 5. **Publish** (`src/export/`): `structure.ts` lays out the SharePoint library from the answers (only folders the device needs); `docx.ts` writes each procedure as a Word draft; `package.ts` builds the ZIP, master document list, README and PnP PowerShell script; `sharepoint.ts` creates the library, columns, folders and files through Microsoft Graph, never overwriting existing files.
+
+## How the app is laid out
+
+The app menu has four places: **Home**, **Documents**, **Assessments** and **Reviews**. Everything else (the full questionnaire, run history, readiness details, the template library, publishing) is reached from one of them.
+
+- **The path** (`src/guide/plan.ts`): six steps from a blank workspace to an approved quality system: describe the device, answer the agent's questions, confirm what it proposed, complete the assessments, send to an engineer, engineer review and approval. Home shows the first unfinished step as the one thing to do next (`src/components/PlanBlock.tsx`). "Save and send for review" saves a run and submits every complete draft in one click.
+- **The guide** (`src/pages/Start.tsx`, `src/guide/questions.ts`): asks the questions that decide which documents apply first, then whichever missing answer fills the most documents. Questions the agent can default are left for the confirm step. After the opening questions it offers the drafted documents.
+- **Ask an engineer** (`src/components/AskEngineer.tsx`, `server/routes/help.ts`): a button in the header on every screen. A question becomes a thread, carries the page it was asked from, emails the team (`BIOMEDIX_SALES_EMAIL`), and the reply emails the asker. Signed-out visitors are pointed to sign-in or booking a call.
+- **Demo sign-ins**: in dev mode the sign-in page has one-click "Demo customer" (the example device) and "Demo Biomedix admin" buttons (`POST /api/dev/demo`). They don't exist when the dev mailbox is off.
+
+The "agent" here is rules, not a language model: it reads the description for keywords, derives determinations, proposes defaults and orders the questions. Free-form questions go to a person.
 
 ## Assessments
 

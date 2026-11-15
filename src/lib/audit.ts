@@ -38,6 +38,10 @@ export function describeAudit(e: AuditEntry, { personal = false } = {}): string 
       return `created the project ${t}`;
     case 'project.deleted':
       return `deleted the project ${t}`;
+    case 'help.asked':
+      return `asked an engineer: “${t}”`;
+    case 'help.answered':
+      return `answered: “${t}”`;
     case 'run.saved': {
       const n = Number(d.new ?? 0) + Number(d.revised ?? 0);
       return `saved run ${s(d.run)} of ${t}: ${n} new draft${n === 1 ? '' : 's'}, readiness ${s(d.readiness)}%`;

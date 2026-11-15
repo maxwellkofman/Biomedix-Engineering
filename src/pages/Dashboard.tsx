@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { can, initials, ROLE_LABEL, useAccount } from '../account/AccountContext';
 import { api, type AttentionItem, type Dashboard as DashboardData, type DocCounts } from '../account/api';
 import { AppShell } from '../components/AppShell';
 import { Button, ButtonLink } from '../components/Button';
 import { formatDate, ReadinessRing } from '../components/Lifecycle';
+import { AskForm, ThreadStatus } from '../components/AskEngineer';
+import { NextStep, PlanList } from '../components/PlanBlock';
+import { helpApi, type Thread } from '../help/api';
 import { useIntake } from '../intake/IntakeContext';
 import { describeAudit, timeAgo } from '../lib/audit';
 import { docHref } from '../lib/links';
@@ -14,6 +17,7 @@ import '../styles/flow.css';
 import '../styles/account.css';
 import '../styles/org.css';
 import '../styles/requests.css';
+import '../styles/clean.css';
 
 const PIPELINE: { key: keyof DocCounts; label: string }[] = [
   { key: 'approved', label: 'Approved' },
@@ -198,18 +202,8 @@ function MyRequests() {
       .catch(() => setRows([]));
   }, []);
   if (!rows) return null;
-  if (!rows.length)
-    return (
-      <section className="card card--compact stack" aria-labelledby="scan-cta-h">
-        <h2 id="scan-cta-h" className="card__title card__title--sm">
-          Free gap scan
-        </h2>
-        <p className="text-muted-sm">Share your current trace matrix, risk file or test reports. An engineer reviews what the checks find and sends a report.</p>
-        <Link to="/gap-scan" className="text-muted-sm">
-          Start a gap scan →
-        </Link>
-      </section>
-    );
+  // Nothing to show until there's a request; the gap scan is offered from the Help page.
+  if (!rows.length) return null;
   return (
     <section className="card card--compact stack" aria-labelledby="req-h">
       <div className="outline__head">
@@ -244,24 +238,117 @@ function MyRequests() {
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
+/** Ask an engineer, with the latest question's status. */
+function HelpCard() {
+  const { org } = useAccount();
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const load = useCallback(() => {
+    if (org) helpApi.list(org.id).then((r) => setThreads(r.threads)).catch(() => setThreads([]));
+  }, [org]);
+  useEffect(load, [load]);
+  const active = threads.filter((t) => t.status !== 'closed').slice(0, 3);
   return (
-    <div className="stat">
-      <span className="stat__label">{label}</span>
-      <strong className="stat__value">{value}</strong>
-      {sub && <span className="stat__sub">{sub}</span>}
-    </div>
+    <section className="card card--compact stack" aria-labelledby="help-h">
+      <div className="outline__head">
+        <h2 id="help-h" className="card__title card__title--sm">
+          Ask an engineer
+        </h2>
+        {threads.length > 0 && (
+          <Link to="/app/help" className="text-muted-sm">
+            View all
+          </Link>
+        )}
+      </div>
+      <p className="text-muted-sm">The agent drafts. A Biomedix engineer answers questions and reviews every document.</p>
+      {active.length > 0 && (
+        <ul className="list-reset stack help-recent">
+          {active.map((t) => (
+            <li key={t.id}>
+              <Link to={`/app/help?open=${t.id}`} className="help-recent__item">
+                <span className="help-recent__subject">{t.subject}</span>
+                <ThreadStatus t={t} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <AskForm id="ask-home" rows={2} onSent={load} />
+    </section>
+  );
+}
+
+/** The same home screen before sign-in: the path, and a prompt to save the work. */
+function GuestHome() {
+  const { intake, started, readiness, suite } = useIntake();
+  return (
+    <AppShell>
+      <main className="app-main dash-main">
+        <div className="home-head">
+          <div className="stack home-head__copy">
+            <h1 className="home-head__title">{started ? intake.device.name || 'Your quality system' : 'Welcome to Biomedix.'}</h1>
+            <p className="text-muted-sm">
+              {started
+                ? `${suite.applicable.length} documents drafted · ${readiness.pct}% ready · saved in this browser only`
+                : 'Describe your device and the agent drafts the quality system it needs. An engineer reviews every document.'}
+            </p>
+          </div>
+        </div>
+        <NextStep />
+        <div className="dash-grid">
+          <div className="stack">
+            <PlanList />
+          </div>
+          <div className="stack dash-side">
+            <section className="card card--compact stack" aria-labelledby="save-h">
+              <h2 id="save-h" className="card__title card__title--sm">
+                Save your work
+              </h2>
+              <p className="text-muted-sm">
+                A free account keeps your answers and drafts, lets you send documents to an engineer, and records approvals.
+              </p>
+              <div className="button-row button-row--tight">
+                <ButtonLink to="/sign-up?next=/app/dashboard" size="sm">
+                  Create an account
+                </ButtonLink>
+                <ButtonLink to="/sign-in?next=/app/dashboard" variant="outline" size="sm">
+                  Sign in
+                </ButtonLink>
+              </div>
+            </section>
+            <section className="card card--compact stack" aria-labelledby="talk-h">
+              <h2 id="talk-h" className="card__title card__title--sm">
+                Talk to an engineer
+              </h2>
+              <p className="text-muted-sm">Walk through your device with a Biomedix engineer, or send your files for a free gap scan.</p>
+              <div className="button-row button-row--tight">
+                <ButtonLink to="/demo" variant="outline" size="sm">
+                  Book a call
+                </ButtonLink>
+                <ButtonLink to="/gap-scan" variant="text" size="sm">
+                  Free gap scan
+                </ButtonLink>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </AppShell>
   );
 }
 
 export default function Dashboard() {
+  const { status } = useAccount();
+  return status === 'signed-in' ? <CompanyHome /> : <GuestHome />;
+}
+
+function CompanyHome() {
   const { org, user } = useAccount();
-  const { projectId, openProject, newProject, guestDraft, discardGuest, readiness, intake } = useIntake();
+  const { projectId, openProject, newProject, readiness, intake } = useIntake();
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const steps = useGettingStarted(data);
+  const [showProjects, setShowProjects] = useState(() => window.location.hash === '#projects');
 
   const load = useCallback(() => {
     if (!org) return;
@@ -309,46 +396,32 @@ export default function Dashboard() {
   const projects = (data?.projects ?? []).map((p) =>
     p.id === projectId ? { ...p, device: intake.device.name, company: intake.company.name, readiness: readiness.pct } : p,
   );
-  const avg = projects.length ? Math.round(projects.reduce((n, p) => n + p.readiness, 0) / projects.length) : 0;
-  const t = data?.totals;
   const attention = data?.attention;
   const noApprover = data && !data.team.some((m) => m.approver);
   const todo = (attention?.approvals.length ?? 0) + (attention?.returned.length ?? 0);
-  const setupLeft = steps.filter((s) => !s.done).length;
 
   return (
     <AppShell>
       <main className="app-main dash-main">
-        <div className="suite-head">
-          <div className="stack suite-head__copy">
-            <span className="eyebrow">COMPANY DASHBOARD</span>
-            <h1 className="setup-main__title">{org.name}</h1>
-            <p className="setup-main__blurb">
-              {hello()}, {user.name.split(' ')[0]}. You’re {ROLE_LABEL[org.role].toLowerCase()}
+        <div className="home-head">
+          <div className="stack home-head__copy">
+            <h1 className="home-head__title">
+              {hello()}, {user.name.split(' ')[0]}.
+            </h1>
+            <p className="text-muted-sm">
+              {org.name} · {intake.device.name || 'Untitled project'} · you’re {ROLE_LABEL[org.role].toLowerCase()}
               {org.approver ? ' and an approver' : ''}
-              {todo ? ` · ${todo} item${todo === 1 ? '' : 's'} need${todo === 1 ? 's' : ''} you.` : '.'}
             </p>
           </div>
-          <div className="button-row">
-            {can(org, 'edit') && (
-              <Button
-                disabled={busy === 'new'}
-                onClick={() =>
-                  void guard('new', async () => {
-                    await newProject('blank');
-                    navigate('/app/form');
-                  })
-                }
-              >
-                New project
-              </Button>
-            )}
-            {can(org, 'manage') && (
-              <ButtonLink to="/app/settings/members" variant="outline">
-                Invite people
-              </ButtonLink>
-            )}
-          </div>
+          <Link to="/app/readiness" className="home-ring" aria-label={`Readiness ${readiness.pct}%. See details`}>
+            <ReadinessRing pct={readiness.pct} size={64} />
+            <span className="stack">
+              <strong>Readiness</strong>
+              <span className="text-muted-sm">
+                {readiness.counts.approved} of {readiness.docs.length} approved
+              </span>
+            </span>
+          </Link>
         </div>
 
         {error && (
@@ -357,16 +430,13 @@ export default function Dashboard() {
           </p>
         )}
 
-        <section className="stats" aria-label="Company totals">
-          <Stat label="Projects" value={t?.projects ?? '—'} sub="one per device" />
-          <Stat label="Average readiness" value={data ? `${avg}%` : '—'} sub="across projects" />
-          <Stat label="In Biomedix review" value={t?.in_review ?? '—'} sub="documents" />
-          <Stat label="Awaiting approval" value={t?.awaiting_approval ?? '—'} sub="reviewed, not approved" />
-          <Stat label="Approved" value={t?.approved ?? '—'} sub="documents, current draft" />
-        </section>
+        <NextStep />
 
         <div className="dash-grid">
           <div className="stack">
+            <PlanList />
+
+            {(todo > 0 || (noApprover && can(org, 'manage'))) && (
             <section className="card card--compact stack" aria-labelledby="att-h">
               <div className="outline__head">
                 <h2 id="att-h" className="card__title card__title--sm">
@@ -436,36 +506,38 @@ export default function Dashboard() {
                 </ul>
               )}
             </section>
-
-            {guestDraft && can(org, 'edit') && (
-              <section className="card card--compact project-import" aria-labelledby="import-h">
-                <div className="stack">
-                  <h2 id="import-h" className="card__title card__title--sm">
-                    Answers in this browser
-                  </h2>
-                  <p className="text-muted-sm">
-                    {[guestDraft.company.name, guestDraft.device.name].filter(Boolean).join(' · ') || 'Untitled'}, entered before you signed
-                    in and not saved yet.
-                  </p>
-                </div>
-                <div className="button-row button-row--tight">
-                  <Button size="sm" disabled={busy === 'import'} onClick={() => void guard('import', () => newProject('guest'))}>
-                    Save as a project
-                  </Button>
-                  <Button variant="text" size="sm" onClick={discardGuest}>
-                    Discard
-                  </Button>
-                </div>
-              </section>
             )}
 
-            <section id="projects" className="stack" aria-labelledby="proj-h">
-              <div className="outline__head">
-                <h2 id="proj-h" className="card__title">
+            <details
+              id="projects"
+              className="card card--compact fold"
+              open={showProjects}
+              onToggle={(e) => setShowProjects((e.target as HTMLDetailsElement).open)}
+            >
+              <summary className="fold__summary">
+                <span id="proj-h" className="card__title card__title--sm">
                   Projects
-                </h2>
-                <span className="text-muted-sm">One per device. Each has its own answers, runs, drafts and sign-offs.</span>
-              </div>
+                </span>
+                <span className="text-muted-sm">{data ? `${projects.length} · one per device` : ''}</span>
+              </summary>
+              <div className="stack fold__body">
+              {can(org, 'edit') && (
+                <div className="button-row button-row--tight">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === 'new'}
+                    onClick={() =>
+                      void guard('new', async () => {
+                        await newProject('blank');
+                        navigate('/app/start');
+                      })
+                    }
+                  >
+                    New project
+                  </Button>
+                </div>
+              )}
               {!data ? (
                 <p className="text-muted-sm">Loading projects…</p>
               ) : !projects.length ? (
@@ -538,15 +610,24 @@ export default function Dashboard() {
                   })}
                 </ul>
               )}
-            </section>
+              </div>
+            </details>
           </div>
 
           <div className="stack dash-side">
-            {setupLeft > 0 && <GettingStarted steps={steps} />}
+            <HelpCard />
 
             <MyRequests />
 
-            <section className="card card--compact stack" aria-labelledby="team-h">
+            <details className="card card--compact fold">
+              <summary className="fold__summary">
+                <span className="card__title card__title--sm">Team and activity</span>
+                <span className="text-muted-sm">
+                  {data ? `${data.teamCount} ${data.teamCount === 1 ? 'person' : 'people'}` : ''}
+                </span>
+              </summary>
+              <div className="stack fold__body">
+            <section className="stack" aria-labelledby="team-h">
               <div className="outline__head">
                 <h2 id="team-h" className="card__title card__title--sm">
                   Team
@@ -583,7 +664,7 @@ export default function Dashboard() {
               )}
             </section>
 
-            <section className="card card--compact stack" aria-labelledby="act-h">
+            <section className="stack" aria-labelledby="act-h">
               <div className="outline__head">
                 <h2 id="act-h" className="card__title card__title--sm">
                   Recent activity
@@ -606,6 +687,8 @@ export default function Dashboard() {
                 ))}
               </ul>
             </section>
+              </div>
+            </details>
           </div>
         </div>
       </main>

@@ -11,12 +11,12 @@ import { AcceptInvite, VerifyEmail } from './pages/auth/EmailLinks';
 import { ForgotPassword, ResetPassword } from './pages/auth/PasswordReset';
 import SignIn from './pages/auth/SignIn';
 import SignUp from './pages/auth/SignUp';
-import ComingSoon from './pages/ComingSoon';
 import Dashboard, { Welcome } from './pages/Dashboard';
 import DevMail from './pages/DevMail';
 import DocHistory from './pages/DocHistory';
 import DocumentView from './pages/DocumentView';
 import History from './pages/History';
+import Help from './pages/Help';
 import Home from './pages/Home';
 import ProcedureLibrary from './pages/ProcedureLibrary';
 import Publish from './pages/Publish';
@@ -24,11 +24,13 @@ import QuestionForm from './pages/QuestionForm';
 import Readiness from './pages/Readiness';
 import ReviewQueue from './pages/ReviewQueue';
 import Setup from './pages/Setup';
+import Start from './pages/Start';
 import { Activity, CompanySettings, Members } from './pages/settings/Company';
 import { Profile, Security, Sessions } from './pages/settings/Personal';
 import RequestForm from './pages/requests/RequestForm';
 import RequestStatus from './pages/requests/RequestStatus';
 import { StaffRequests, StaffScan, StaffScans } from './pages/staff/Scans';
+import { StaffOverview, StaffQuestions } from './pages/staff/Overview';
 import { StaffAdmin, StaffReviews } from './pages/staff/Staff';
 import Suite from './pages/Suite';
 
@@ -40,7 +42,11 @@ const TITLES: Record<string, string> = {
   '/reset-password': 'Choose a new password · Biomedix Engineering',
   '/verify-email': 'Confirm your email · Biomedix Engineering',
   '/confirm-email': 'Confirm your new email · Biomedix Engineering',
-  '/app/dashboard': 'Dashboard · Biomedix Engineering',
+  '/app/dashboard': 'Home · Biomedix Engineering',
+  '/app/start': 'Guide · Biomedix Engineering',
+  '/app/help': 'Ask an engineer · Biomedix Engineering',
+  '/staff': 'Overview · Biomedix staff',
+  '/staff/questions': 'Questions · Biomedix staff',
   '/app/welcome': 'Welcome · Biomedix Engineering',
   '/app/settings/profile': 'Profile · Settings · Biomedix Engineering',
   '/app/settings/security': 'Password and two-factor · Settings · Biomedix Engineering',
@@ -135,7 +141,7 @@ function AppRoute({ children, account = false, open = false }: { children: React
 function AppIndex() {
   const { status } = useAccount();
   if (status === 'loading') return null;
-  return <Navigate to={status === 'signed-in' ? '/app/dashboard' : '/app/review'} replace />;
+  return <Navigate to="/app/dashboard" replace />;
 }
 
 export default function App() {
@@ -160,7 +166,9 @@ export default function App() {
       <Route path="/gap-scan" element={<RequestForm key="scan" mode="scan" />} />
       <Route path="/request/:token" element={<RequestStatus />} />
       <Route path="/app" element={<AppIndex />} />
-      <Route path="/app/dashboard" element={app(<Dashboard />, true)} />
+      <Route path="/app/dashboard" element={app(<Dashboard />)} />
+      <Route path="/app/start" element={app(<Start />)} />
+      <Route path="/app/help" element={app(<Help />)} />
       <Route path="/app/welcome" element={settings(<Welcome />)} />
       <Route path="/app/settings" element={<Navigate to="/app/settings/profile" replace />} />
       <Route path="/app/settings/profile" element={settings(<Profile />)} />
@@ -169,6 +177,8 @@ export default function App() {
       <Route path="/app/settings/company" element={settings(<CompanySettings />)} />
       <Route path="/app/settings/members" element={app(<Members />, true)} />
       <Route path="/app/settings/activity" element={app(<Activity />, true)} />
+      <Route path="/staff" element={settings(<StaffOverview />)} />
+      <Route path="/staff/questions" element={settings(<StaffQuestions />)} />
       <Route path="/staff/reviews" element={settings(<StaffReviews />)} />
       <Route path="/staff/admin" element={settings(<StaffAdmin />)} />
       <Route path="/staff/scans" element={settings(<StaffScans />)} />
@@ -191,9 +201,9 @@ export default function App() {
       <Route path="/app/assessments/risk" element={app(<RiskPage />)} />
       <Route path="/app/projects" element={<Navigate to="/app/dashboard#projects" replace />} />
       <Route path="/app/account" element={<Navigate to="/app/settings/profile" replace />} />
-      <Route path="/app/agents" element={app(<ComingSoon title="Agents" />)} />
-      <Route path="/app/trace" element={app(<ComingSoon title="Trace graph" />)} />
-      <Route path="/app/gates" element={app(<ComingSoon title="Gates" />)} />
+      <Route path="/app/agents" element={<Navigate to="/app/dashboard" replace />} />
+      <Route path="/app/trace" element={<Navigate to="/app/dashboard" replace />} />
+      <Route path="/app/gates" element={<Navigate to="/app/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

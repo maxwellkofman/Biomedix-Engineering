@@ -3,20 +3,19 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { initials, ROLE_LABEL, useAccount } from '../account/AccountContext';
 import { api } from '../account/api';
 import { useIntake, type SaveState } from '../intake/IntakeContext';
+import { HelpButton } from './AskEngineer';
 import { Button, ButtonLink } from './Button';
 import { Logo } from './Logo';
 import { Popover } from './Popover';
 import '../styles/account.css';
 import '../styles/org.css';
 
+/** Four places. Everything else is reached from one of them. */
 const NAV = [
-  { label: 'Review queue', to: '/app/review' },
-  { label: 'Documentation', to: '/app/suite', also: ['/app/setup', '/app/form', '/app/publish', '/app/history', '/app/readiness'] },
+  { label: 'Home', to: '/app/dashboard', also: ['/app/start', '/app/welcome', '/app/help'] },
+  { label: 'Documents', to: '/app/suite', also: ['/app/setup', '/app/form', '/app/publish', '/app/history', '/app/readiness', '/app/procedures'] },
   { label: 'Assessments', to: '/app/assessments' },
-  { label: 'Agents', to: '/app/agents' },
-  { label: 'Trace graph', to: '/app/trace' },
-  { label: 'Gates', to: '/app/gates' },
-  { label: 'Procedures', to: '/app/procedures' },
+  { label: 'Reviews', to: '/app/review' },
 ];
 
 const SAVE_LABEL: Record<SaveState, string> = {
@@ -73,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const project = intake.device.name || (mode === 'account' ? 'Untitled project' : '[Device]');
-  const nav = mode === 'account' ? [{ label: 'Dashboard', to: '/app/dashboard' }, ...NAV] : NAV;
+  const nav = NAV;
 
   return (
     <div className="app">
@@ -94,7 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </NavLink>
               ))}
               {user?.staffRole && (
-                <NavLink to="/staff/reviews" className={({ isActive }) => `app-nav__link app-nav__link--staff${isActive || pathname.startsWith('/staff') ? ' active' : ''}`}>
+                <NavLink to="/staff" className={({ isActive }) => `app-nav__link app-nav__link--staff${isActive || pathname.startsWith('/staff') ? ' active' : ''}`}>
                   Biomedix
                 </NavLink>
               )}
@@ -115,6 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </span>
               </Link>
             )}
+            <HelpButton />
             {mode === 'account' ? (
               <span className="app-header__context">
                 <Popover
@@ -186,9 +186,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )}
               </span>
             ) : (
-              <span className="app-header__project">
-                {intake.company.name || '[Company]'} · {project}
-              </span>
+              (intake.company.name || intake.device.name) && (
+                <span className="app-header__project">{[intake.company.name, intake.device.name].filter(Boolean).join(' · ')}</span>
+              )
             )}
             {status === 'signed-in' && user ? (
               <Popover
@@ -215,20 +215,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {user.staffRole && (
                       <>
                         <span className="menu__rule" />
-                        <Link to="/staff/reviews" className="menu__item">
-                          Biomedix reviews
+                        <Link to="/staff" className="menu__item">
+                          Biomedix {user.staffRole === 'admin' ? 'admin' : 'staff'} dashboard
                         </Link>
-                        <Link to="/staff/scans" className="menu__item">
-                          Gap scans
-                        </Link>
-                        <Link to="/staff/requests" className="menu__item">
-                          Demo requests
-                        </Link>
-                        {user.staffRole === 'admin' && (
-                          <Link to="/staff/admin" className="menu__item">
-                            Biomedix admin
-                          </Link>
-                        )}
                       </>
                     )}
                     {dev && (

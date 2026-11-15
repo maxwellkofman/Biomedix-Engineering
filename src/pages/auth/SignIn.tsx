@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAccount } from '../../account/AccountContext';
 import { ApiError } from '../../account/api';
+import { helpApi } from '../../help/api';
 import { Button } from '../../components/Button';
 import { CodeField, PasswordField } from '../../components/forms';
 import { isStarted, useIntake } from '../../intake/IntakeContext';
@@ -16,7 +17,7 @@ const NOTICES: Record<string, string> = {
 };
 
 export default function SignIn() {
-  const { status, signIn, completeSignIn } = useAccount();
+  const { status, signIn, completeSignIn, dev, apply } = useAccount();
   const { intake, mode } = useIntake();
   const [params] = useSearchParams();
   const location = useLocation();
@@ -66,6 +67,19 @@ export default function SignIn() {
         setTicket(null);
         setCode('');
       }
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setBusy(false);
+    }
+  };
+
+  /** Dev mode only: a ready-made customer or Biomedix admin account. */
+  const demo = async (as: 'user' | 'admin') => {
+    setBusy(true);
+    setError(null);
+    try {
+      apply(await helpApi.demo(as));
+      navigate(as === 'admin' ? '/staff' : '/app/dashboard', { replace: true });
+    } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
       setBusy(false);
     }
@@ -121,10 +135,9 @@ export default function SignIn() {
       eyebrow="SIGN IN"
       title="Pick up where you left off."
       points={[
-        'Your company’s projects, runs and drafts in one place',
-        'Send drafts to Biomedix technical review',
-        'Record approvals with an e-signature',
-        'See your compliance readiness climb to 100%',
+        'One next step, every time you sign in',
+        'Send drafts to a Biomedix engineer for review',
+        'Approve documents with an e-signature',
       ]}
       cardTitle="Sign in to Biomedix"
       foot={
@@ -184,6 +197,20 @@ export default function SignIn() {
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
           {!remember && <p className="text-muted-sm">On a shared computer: you’ll be signed out after 12 hours or when the browser closes.</p>}
+          {dev && (
+            <div className="stack demo-logins">
+              <span className="demo-logins__label">Demo mode: sign in with one click</span>
+              <div className="button-row button-row--tight">
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => void demo('user')}>
+                  Demo customer
+                </Button>
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => void demo('admin')}>
+                  Demo Biomedix admin
+                </Button>
+              </div>
+              <span className="text-muted-sm">Only shown while the dev mailbox is on. Turn it off before sharing a public link.</span>
+            </div>
+          )}
         </form>
       )}
     </AuthLayout>

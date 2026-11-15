@@ -11,6 +11,7 @@ import { authRoutes } from './routes/auth.ts';
 import { devRoutes } from './routes/dev.ts';
 import { orgRoutes } from './routes/orgs.ts';
 import { projectRoutes } from './routes/projects.ts';
+import { helpRoutes } from './routes/help.ts';
 import { requestRoutes, sweepRequests } from './routes/requests.ts';
 import { staffRoutes } from './routes/staff.ts';
 
@@ -32,7 +33,7 @@ function appUrl(req: IncomingMessage, dev: boolean) {
 }
 
 export function apiMiddleware({ dev = false }: { dev?: boolean } = {}) {
-  const routes: Route[] = [...authRoutes, ...accountRoutes, ...orgRoutes, ...projectRoutes, ...requestRoutes, ...staffRoutes, ...(dev ? devRoutes : [])];
+  const routes: Route[] = [...authRoutes, ...accountRoutes, ...orgRoutes, ...projectRoutes, ...requestRoutes, ...helpRoutes, ...staffRoutes, ...(dev ? devRoutes : [])];
   let swept = false;
 
   return async (req: IncomingMessage, res: ServerResponse, next: Next) => {

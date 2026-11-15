@@ -253,7 +253,7 @@ function gapCount(findings: { severity: string }[]) {
 }
 
 /** Where new requests are announced: BIOMEDIX_SALES_EMAIL, else every verified Biomedix staff account, else BIOMEDIX_ADMIN_EMAIL. */
-function teamRecipients(): string[] {
+export function teamRecipients(): string[] {
   const env = (process.env.BIOMEDIX_SALES_EMAIL ?? '')
     .split(',')
     .map((s) => s.trim())
