@@ -6,7 +6,8 @@ import { requireStaff, type ProjectRow } from '../access.ts';
 import { audit } from '../audit.ts';
 import { getDb } from '../db.ts';
 import { countStates, docStates, type DocState } from '../docstates.ts';
-import { HttpError, route, str, type Route } from '../http.ts';
+import { HttpError, readRaw, route, str, type Route } from '../http.ts';
+import { checkSignature, readFile } from '../scan/extract.ts';
 import { sendMail } from '../mail.ts';
 import { reauth } from './account.ts';
 import { draftsOf, recordSignoff, signoffs } from './projects.ts';
@@ -19,6 +20,27 @@ const STATE_FOR: Record<string, DocState> = {
 };
 
 export const staffRoutes: Route[] = [
+  /* Document checker: the rules run in the browser; the server only confirms access and reads Word and PDF files. */
+  route('GET', '/staff/checker', (c) => {
+    requireStaff(c.user, ['reviewer', 'admin'], c.dev);
+    return { ok: true };
+  }),
+
+  {
+    // The file is the raw body. It's read in memory and never stored.
+    ...route('PUT', '/staff/checker/extract', async (c) => {
+      requireStaff(c.user, ['reviewer', 'admin'], c.dev);
+      const name = (c.query.get('name') ?? '').replace(/[\\/\u0000-\u001f]/g, '').slice(0, 200) || 'document';
+      const data = await readRaw(c.req, 25 * 1024 * 1024);
+      if (!data.length) throw new HttpError(400, `${name} is empty.`);
+      const bad = checkSignature(name, data);
+      if (bad) throw new HttpError(400, bad);
+      const read = await readFile(name, data);
+      return { name, text: read.text, status: read.status, note: read.note, pages: read.pages };
+    }),
+    raw: true,
+  },
+
   route('GET', '/staff/reviews', (c) => {
     requireStaff(c.user, ['reviewer', 'admin'], c.dev);
     const state = STATE_FOR[c.query.get('state') ?? 'submitted'] ?? 'in_review';

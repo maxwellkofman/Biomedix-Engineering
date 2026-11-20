@@ -77,6 +77,7 @@ In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow
 | `/staff/admin` | Biomedix admin: every company and person, staff roles, two-factor reset (staff admin) |
 | `/staff/scans`, `/staff/scans/:id` | Gap scan queue with due times; one scan's files, automated findings to keep, edit or dismiss, your own findings, summary and send (staff) |
 | `/staff/requests` | Every demo request and gap scan, with status (new, contacted, demo booked, closed) and notes (staff) |
+| `/staff/checker` | Document checker: generated documents, a pasted or uploaded draft, and the rule list (staff) |
 | `/sign-in`, `/sign-up` | Sign-in (with a two-factor step) and sign-up (creates your company, or joins one from an invitation) |
 | `/forgot-password`, `/reset-password` | Password reset by emailed link |
 | `/verify-email`, `/confirm-email` | Email confirmation for new accounts and changed addresses |
@@ -194,6 +195,28 @@ Microsoft doesn't let apps switch on minor versions or required check-out, so th
 
 To tailor another section, add a body for it in `src/templates/content.ts` using `{{token}}` slots from `TOKENS` in `derive.ts`; sections without a body get a generic scoped draft.
 
+## Document checker
+
+An internal tool that checks generated documents, and any draft such as text from a language model, against FDA wording and technical-writing rules. It is a rule set, not a model. Each finding names its rule and the guideline behind it, and an engineer decides what to change. It lives in `src/validate/`, which runs in the browser and in Node.
+
+**What it checks** (54 rules, listed with sources on the *Rules* tab):
+- **Release blockers**: values still needed, TBDs and template brackets, chat-reply text left in by a text generator ("Here is a draft…", "I hope this helps"), leftover Markdown or HTML, repeated sentences, empty sections.
+- **Regulatory language**: "FDA approved" for a 510(k) or De Novo device (21 CFR 807.97), "FDA certified", "FDA-registered device" (807.39), "Part 11 compliant software"; guidance described as a requirement (21 CFR 10.115(d)); old QSR terms (DHF, DMR, DHR, "management with executive responsibility") since the QMSR took effect on 2 February 2026; the old inspection exemption for management review and audit records (820.180(c)); Level of Concern (replaced by Documentation Level in 2023); absolute safety claims; promotional wording; "days" without calendar or working (803.50, 803.53, 806.10); ISO 14971 terms; FDA spellings (premarket, 510(k), De Novo, Class II).
+- **Citations**: Part 820 sections removed by the QMSR (each points to its replacement, e.g. 820.30 → ISO 13485:2016 §7.3); Part 11 sections and paragraphs that don't exist (e.g. 11.10(l)); unknown 21 CFR device parts; superseded, amendment-only or unknown standard editions (ISO 14971:2007, IEC 62304:2015); standards never given an edition; references to documents that aren't in the set.
+- **Requirement wording**: INCOSE Guide to Writing Requirements rules (vague terms R7, escape clauses R8, open-ended lists R9, superfluous infinitives R10, active voice R2, subject R3, slashes R17, one thought per sentence R18, purpose phrases R20, pronouns R24, absolutes R26, "each" R32, temporal dependencies R35, acronyms R37); EARS patterns for triggers ("When…, the system shall…"); verbal forms from ISO/IEC Directives Part 2 ("should", "must", "may not") and ISO/IEC/IEEE 29148 ("will"); duplicate IDs.
+- **Plain language and consistency**: long sentences, wordy phrases, filler, "we" instead of a role, contractions, undefined or conflicting acronyms, two spellings of one term, number, unit and date formats (leading zeros, trailing zeros in doses, ISO 8601 dates).
+- **Structure**: revision, approval and document ID shown; purpose, scope, responsibilities, references and records sections in procedures.
+
+Citations are checked against a catalog of 21 CFR sections and standard editions (`src/validate/catalog.ts`, checked November 2026). Anything not in the catalog is reported as "can't confirm", never as wrong; update the catalog when FDA or ISO/IEC publish changes.
+
+**Where it runs**
+- **/staff/checker → Generated documents**: the whole suite for this workspace, the example device or blank answers. Findings are split into *template wording* (Biomedix fixes the template), *setup answers* (the customer's own text) and *values still needed*. A by-rule table shows which rules fire where. CSV export.
+- **/staff/checker → Paste or upload a draft**: Markdown or plain text, or a Word or PDF file. Files are read on the server in memory and not stored (`PUT /api/staff/checker/extract`). The document type and FDA pathway are detected and can be changed. The draft is shown with each finding marked in place; selecting a finding finds it in the text and the other way round.
+- **Technical reviews**: each draft under review shows its writing checks, with a link that opens it in the checker.
+- **Command line**: `npm run check:docs` checks the example suite and exits 1 if template wording has an error-level finding, so it can run in CI. `--details` lists every finding, `--blank` uses empty answers, `--intake answers.json` your own answers, `--file draft.md` any Markdown or text file, `--csv out.csv` writes the findings, `--fail-on warning` tightens the gate, and `--self-test` checks that every rule flags its own bad example and passes its good one.
+
+Rules can be switched off per browser on the *Rules* tab. Adding a rule means adding an entry in `src/validate/rules.ts`, with the guideline it comes from and, ideally, a bad and good example for the self-test.
+
 ## Structure
 
 - `src/styles/tokens.css` holds the design tokens (colors, fonts, radii); `global.css` holds the shared primitives (buttons, cards, pills, badges, grid); `home.css` and `app.css` hold the page styles.
@@ -205,4 +228,5 @@ To tailor another section, add a body for it in `src/templates/content.ts` using
 - `server/` holds the API: `api.ts` mounts the routes in `server/routes/` (auth, account, orgs, projects, requests, staff, dev); `access.ts` decides who can do what; `auth.ts` handles passwords, sessions and one-time links; `totp.ts` two-factor; `mail.ts` email; `audit.ts` the activity log; `db.ts` storage and migrations; `start.ts` the production server; `cli.ts` staff roles.
 - `src/data/` contains the review queue items and the procedure library content.
 - `src/assessments/` holds the Part 11 and risk assessment models, checks and document builders; `src/pages/assessments/` their pages.
+- `src/validate/` holds the document checker (`rules.ts`, `catalog.ts`, `parse.ts`, `generated.ts`); `src/checker/` its results view; `server/check-docs.ts` the command line.
 - Text in square brackets (`[YOUR PRICE]`, `[Company]`, `[Reviewer name]`) is a placeholder waiting for real content.

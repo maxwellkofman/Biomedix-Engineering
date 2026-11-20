@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { NavLink, useSearchParams } from 'react-router-dom';
+import { NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAccount } from '../../account/AccountContext';
 import { api, ApiError, type ReviewDetail, type ReviewItem, type StaffOrg, type StaffRole, type StaffUser } from '../../account/api';
 import { AppShell } from '../../components/AppShell';
@@ -9,6 +9,10 @@ import { formatDate } from '../../components/Lifecycle';
 import { Markdown } from '../../components/Markdown';
 import { timeAgo } from '../../lib/audit';
 import { diffLines, withContext } from '../../lib/diff';
+import { loadDisabled } from '../../checker/api';
+import { SeverityChip } from '../../checker/Results';
+import { docTypeFor } from '../../validate/generated.ts';
+import { checkDoc, excerpt, guessPathway, parseMarkdown, RULE_BY_ID } from '../../validate/index.ts';
 import '../../styles/app.css';
 import '../../styles/flow.css';
 import '../../styles/account.css';
@@ -43,6 +47,9 @@ export function StaffNav() {
       <NavLink to="/staff/requests" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
         Demo requests
       </NavLink>
+      <NavLink to="/staff/checker" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
+        Document checker
+      </NavLink>
       {user?.staffRole === 'admin' && (
         <NavLink to="/staff/admin" className={({ isActive }) => `pill${isActive ? ' pill--active' : ''}`}>
           Companies and people
@@ -69,6 +76,54 @@ export function Blocked({ error }: { error: ApiError | Error }) {
 }
 
 /* ---------- Technical reviews ---------- */
+
+/** The document checker's findings for the draft under review. */
+function WritingChecks({ markdown, docId, title }: { markdown: string; docId: string; title: string }) {
+  const navigate = useNavigate();
+  const report = useMemo(() => {
+    const doc = parseMarkdown(markdown, title);
+    doc.type = docTypeFor(docId);
+    return checkDoc(doc, { pathway: guessPathway(markdown), disabled: loadDisabled() });
+  }, [markdown, docId, title]);
+  const top = report.findings.filter((f) => f.severity !== 'note').slice(0, 6);
+  const { error, warning, note } = report.counts;
+  return (
+    <section className="card card--compact stack chk-panel" aria-labelledby="chk-h">
+      <h3 id="chk-h" className="card__title card__title--sm">
+        Writing checks
+      </h3>
+      <p className="text-muted-sm">
+        {error + warning + note
+          ? `${error} must fix · ${warning} should fix · ${note} to consider. Rules, not a model: you decide.`
+          : 'The document checker found nothing to change.'}
+      </p>
+      {top.length > 0 && (
+        <ul className="list-reset stack chk-panel__list">
+          {top.map((f, i) => {
+            const u = report.units[f.unit];
+            const x = excerpt(u, f, 0);
+            return (
+              <li key={i} className="chk-panel__item">
+                <span>
+                  <SeverityChip s={f.severity} /> <strong>{RULE_BY_ID.get(f.rule)!.name}</strong>
+                </span>
+                <span className="text-muted-sm">
+                  “{x.hit.length > 60 ? `${x.hit.slice(0, 57)}…` : x.hit}” · {f.message}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {error + warning > top.length && <p className="text-muted-sm">And {error + warning - top.length} more.</p>}
+      <div className="button-row button-row--tight">
+        <Button size="sm" variant="outline" onClick={() => navigate('/staff/checker?tab=paste', { state: { text: markdown, title: `${docId} ${title}`, docId } })}>
+          Open in document checker
+        </Button>
+      </div>
+    </section>
+  );
+}
 
 export function StaffReviews() {
   const { user } = useAccount();
@@ -263,6 +318,7 @@ export function StaffReviews() {
               </div>
 
               <div className="stack review-grid__side">
+                <WritingChecks markdown={detail.latest.markdown} docId={detail.docId} title={detail.latest.title} />
                 <section className="card card--compact card--gap-10" aria-labelledby="hist-h">
                   <h3 id="hist-h" className="card__title card__title--sm">
                     Sign-off history

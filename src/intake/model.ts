@@ -1,4 +1,4 @@
-import { EMPTY_PART11, EMPTY_RISK, type Part11Answers, type RiskAnswers } from '../assessments/model.ts';
+import { EMPTY_PART11, EMPTY_RISK, normalizePart11, normalizeRisk, type Part11Answers, type RiskAnswers } from '../assessments/model.ts';
 
 /**
  * Everything the customer tells us: setup answers (all strings, so the form
@@ -217,3 +217,15 @@ export const STEPS: { id: StepId; label: string; blurb: string }[] = [
   { id: 'quality', label: 'Quality system', blurb: 'Where records live and how the system runs' },
   { id: 'team', label: 'Team', blurb: 'Who owns, reviews and approves' },
 ];
+
+/** Fill in any fields missing from stored answers, so fields added later get their defaults. */
+export function mergeIntake(partial: Partial<Intake> | undefined): Intake {
+  const intake = { ...EMPTY_INTAKE } as Intake;
+  for (const k of Object.keys(EMPTY_INTAKE) as IntakeSection[]) {
+    if (k === 'part11' || k === 'risk') continue;
+    Object.assign(intake, { [k]: { ...EMPTY_INTAKE[k], ...(partial?.[k] ?? {}) } });
+  }
+  intake.part11 = normalizePart11(partial?.part11);
+  intake.risk = normalizeRisk(partial?.risk);
+  return intake;
+}

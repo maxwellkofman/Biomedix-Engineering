@@ -44,7 +44,33 @@ export interface BuiltDoc {
   progress: DocProgress;
 }
 
-const txt = (text: string): Segment[] => [{ kind: 'text', text }];
+/*
+ * Values the customer entered are marked while the document is assembled, and
+ * txt() turns the marks into segments that carry the answer's label. The
+ * document checker uses the label to tell assessment answers from template
+ * wording; renderers only read `text`, so the marks never reach an export.
+ */
+const MARK_RE = /\u0001([^\u0002]*)\u0002([^\u0003]*)\u0003|\[([A-Z][^\[\]\n]{2,80})\]/g;
+const mark = (label: string, value: string) => `\u0001${label}\u0002${value}\u0003`;
+const txt = (text: string): Segment[] => {
+  const out: Segment[] = [];
+  let last = 0;
+  for (const m of text.matchAll(MARK_RE)) {
+    if (m.index! > last) out.push({ kind: 'text', text: text.slice(last, m.index) });
+    // A bracketed phrase is an assessment item not answered yet.
+    out.push(m[3] !== undefined ? { kind: 'text', text: m[0], from: m[3], open: true } : { kind: 'text', text: m[2], from: m[1] });
+    last = m.index! + m[0].length;
+  }
+  if (last < text.length) out.push({ kind: 'text', text: text.slice(last) });
+  return out.length ? out : [{ kind: 'text', text }];
+};
+/** A customer-entered value, or the fallback when it's empty. A bracketed fallback names the answer. */
+const or = (v: string, fallback: string, label?: string) => {
+  const name = label ?? /^\[(.+)\]$/.exec(fallback)?.[1];
+  if (!v.trim()) return fallback;
+  return name ? mark(name, v.trim()) : v.trim();
+};
+const ans = (label: string, v: string) => (v.trim() ? mark(label, v.trim()) : '');
 const p = (segs: Segment[]): Block => ({ kind: 'p', segs });
 const list = (items: string[]): Block => ({ kind: 'list', items: items.map(txt) });
 const table = (head: string[], rows: string[][], widths?: number[]): Block => ({
@@ -53,7 +79,6 @@ const table = (head: string[], rows: string[][], widths?: number[]): Block => ({
   rows: rows.map((r) => r.map(txt)),
   widths,
 });
-const or = (v: string, fallback: string) => (v.trim() ? v.trim() : fallback);
 const yesNo = (v: string, yes = 'Yes', no = 'No') => (v === 'yes' ? yes : v === 'no' ? no : '[Not answered]');
 const section = (title: string, purpose: string, blocks: Block[]) => ({ title, purpose, blocks });
 
@@ -110,7 +135,7 @@ function part11Doc({ ix, tpl }: BuildCtx): BuiltDoc {
         ['System', 'Used for', 'Required records', 'Relied on electronically', 'E-signatures', 'Access', 'Risk', 'Determination'],
         sum.systems.map(({ system: s, scope }) => [
           or(s.name, '[Unnamed system]'),
-          or(s.use, '—'),
+          or(s.use, '—', 'System use'),
           yesNo(s.records),
           s.records === 'yes' ? yesNo(s.relied) : '—',
           yesNo(s.signatures),
@@ -165,8 +190,8 @@ function part11Doc({ ix, tpl }: BuildCtx): BuiltDoc {
           String(i + 1),
           f.system,
           `${f.control.id} ${f.control.title}`,
-          `${RESULT_LABEL[f.answer.result as 'partial']}: ${f.answer.evidence.trim()}`,
-          f.answer.action.trim(),
+          `${RESULT_LABEL[f.answer.result as 'partial']}: ${ans('Evidence', f.answer.evidence)}`,
+          ans('Corrective action', f.answer.action),
           or(f.answer.owner, '[Owner]'),
           or(f.answer.due, '[Date]'),
         ]),
@@ -178,7 +203,7 @@ function part11Doc({ ix, tpl }: BuildCtx): BuiltDoc {
     fx.push(
       table(
         ['System', 'Control', 'Rationale'],
-        sum.accepted.map((f) => [f.system, `${f.control.id} ${f.control.title}`, f.answer.evidence.trim()]),
+        sum.accepted.map((f) => [f.system, `${f.control.id} ${f.control.title}`, ans('Risk rationale', f.answer.evidence)]),
         [22, 28, 50],
       ),
     );
@@ -265,7 +290,7 @@ function riskDoc({ ix, d, tpl }: BuildCtx): BuiltDoc {
       list((['A', 'R', 'U'] as const).map((z) => `${ZONE_LABEL[z]}: ${ZONE_HINT[z]}`)),
       p(
         txt(
-          `${sum.matrix === DEFAULT_MATRIX ? 'This is the default matrix in SOP-003.' : 'This matrix was set for this device and differs from the SOP-003 default; the change is justified in the risk management plan.'} For software failures the probability of the failure itself can’t be estimated, so it is taken as 1 and the estimate rests on the probability that the failure leads to harm (P1 × P2 in SOP-003).`,
+          `${sum.matrix === DEFAULT_MATRIX ? 'This is the default matrix in SOP-003.' : 'This matrix was set for this device and differs from the SOP-003 default; the change is justified in the risk management plan.'} For software failures the probability of the failure itself cannot be estimated, so it is taken as 1 and the estimate rests on the probability that the failure leads to harm (P1 × P2 in SOP-003).`,
         ),
       ),
     ]),
@@ -370,7 +395,7 @@ function riskDoc({ ix, d, tpl }: BuildCtx): BuiltDoc {
       ...(sum.hazards.some((x) => x.hazard.link.trim())
         ? [
             p(txt('Traceability to design inputs:')),
-            list(sum.hazards.filter((x) => x.hazard.link.trim()).map((x) => `${x.hazard.ref}: ${x.hazard.link.trim()}`)),
+            list(sum.hazards.filter((x) => x.hazard.link.trim()).map((x) => `${x.hazard.ref}: ${ans('Design input link', x.hazard.link)}`)),
           ]
         : []),
     ]),

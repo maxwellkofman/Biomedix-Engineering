@@ -6,7 +6,10 @@ import { ASSESSMENT_DOCS } from '../assessments/docs';
 
 /* ---------- Output shapes ---------- */
 
-export type Segment = { kind: 'text'; text: string } | { kind: 'token'; key: TokenKey };
+export type Segment =
+  /** `from` names the assessment answer the text came from; `open` marks an item not answered yet. */
+  | { kind: 'text'; text: string; from?: string; open?: boolean }
+  | { kind: 'token'; key: TokenKey };
 export type Block =
   | { kind: 'p'; segs: Segment[] }
   | { kind: 'list'; items: Segment[][] }

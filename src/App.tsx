@@ -32,6 +32,7 @@ import RequestStatus from './pages/requests/RequestStatus';
 import { StaffRequests, StaffScan, StaffScans } from './pages/staff/Scans';
 import { StaffOverview, StaffQuestions } from './pages/staff/Overview';
 import { StaffAdmin, StaffReviews } from './pages/staff/Staff';
+import { StaffChecker } from './pages/staff/Checker';
 import Suite from './pages/Suite';
 
 const TITLES: Record<string, string> = {
@@ -47,6 +48,7 @@ const TITLES: Record<string, string> = {
   '/app/help': 'Ask an engineer · Biomedix Engineering',
   '/staff': 'Overview · Biomedix staff',
   '/staff/questions': 'Questions · Biomedix staff',
+  '/staff/checker': 'Document checker · Biomedix staff',
   '/app/welcome': 'Welcome · Biomedix Engineering',
   '/app/settings/profile': 'Profile · Settings · Biomedix Engineering',
   '/app/settings/security': 'Password and two-factor · Settings · Biomedix Engineering',
@@ -179,6 +181,7 @@ export default function App() {
       <Route path="/app/settings/activity" element={app(<Activity />, true)} />
       <Route path="/staff" element={settings(<StaffOverview />)} />
       <Route path="/staff/questions" element={settings(<StaffQuestions />)} />
+      <Route path="/staff/checker" element={settings(<StaffChecker />)} />
       <Route path="/staff/reviews" element={settings(<StaffReviews />)} />
       <Route path="/staff/admin" element={settings(<StaffAdmin />)} />
       <Route path="/staff/scans" element={settings(<StaffScans />)} />

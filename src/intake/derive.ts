@@ -274,8 +274,8 @@ export function resolveTokens(ix: Intake, d: Derived): TokenValues {
   else auto('retention', RETENTION['lifetime-2']);
 
   const days = ix.qms.trainingDays.trim();
-  if (days) out.trainingWindow = { value: `${days.replace(/\s*days?$/i, '')} days`, auto: false };
-  else auto('trainingWindow', '30 days (proposed)');
+  if (days) out.trainingWindow = { value: `${days.replace(/\s*(?:calendar\s+)?days?$/i, '')} calendar days`, auto: false };
+  else auto('trainingWindow', '30 calendar days (proposed)');
 
   const CAPA: Record<string, string> = {
     standard: 'high risk 30 days, medium 60 days, low 90 days',

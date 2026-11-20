@@ -16,23 +16,12 @@ import { contentHash } from '../lib/hash';
 import { docHref, missingHref } from '../lib/links';
 import { buildSuite, docToMarkdown, type Suite } from '../templates/generate';
 import { derive, resolveTokens, type Derived, type TokenKey, type TokenValues } from './derive';
-import { EMPTY_INTAKE, EXAMPLE_INTAKE, type Intake, type IntakeSection } from './model';
-import { normalizePart11, normalizeRisk } from '../assessments/model';
+import { EMPTY_INTAKE, EXAMPLE_INTAKE, mergeIntake, type Intake, type IntakeSection } from './model';
+
+export { mergeIntake };
 
 const GUEST_KEY = 'biomedix.intake.v1';
 const activeKey = (userId: string, orgId: string) => `biomedix.project.${userId}.${orgId}`;
-
-/** Fill in any fields missing from stored answers, so fields added later get their defaults. */
-export function mergeIntake(partial: Partial<Intake> | undefined): Intake {
-  const intake = { ...EMPTY_INTAKE } as Intake;
-  for (const k of Object.keys(EMPTY_INTAKE) as IntakeSection[]) {
-    if (k === 'part11' || k === 'risk') continue;
-    Object.assign(intake, { [k]: { ...EMPTY_INTAKE[k], ...(partial?.[k] ?? {}) } });
-  }
-  intake.part11 = normalizePart11(partial?.part11);
-  intake.risk = normalizeRisk(partial?.risk);
-  return intake;
-}
 
 export const isStarted = (ix: Intake) => JSON.stringify(ix) !== JSON.stringify(EMPTY_INTAKE);
 

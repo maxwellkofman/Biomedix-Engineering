@@ -38,7 +38,7 @@ const roleLines = (c: TemplateCtx) =>
 export const CONTENT: Record<string, (Body | undefined)[]> = {
   'QM-001': [
     () =>
-      '{{company}}, {{address}}, designs and develops {{device}}, a {{deviceType}}.\n\nThe quality system covers design and development, purchasing, production and release, labeling, distribution, complaint handling and post-market activities for this device. Manufacturing: {{manufacturer}}.',
+      '{{company}}, {{address}}, designs and develops {{device}}, a {{deviceType}}.\n\nThe quality system covers design and development, purchasing, production and release, labeling, distribution, complaint handling and postmarket activities for this device. Manufacturing: {{manufacturer}}.',
     () =>
       'This manual uses the terms of the Quality Management System Regulation (QMSR, 21 CFR 820) and ISO 13485:2016:\n\n- Medical Device File (MDF): replaces the device master record\n- Design and development file: replaces the design history file (DHF)\n- Production record: replaces the device history record (DHR)\n\nLegacy DHF, DMR and DHR references in older records are declared synonyms.',
     (c) => {
@@ -104,7 +104,7 @@ export const CONTENT: Record<string, (Body | undefined)[]> = {
     () =>
       'Applies to every document and record of the {{company}} quality system, paper or electronic. Released documents and records are kept in {{docSystem}}.',
     () =>
-      'Documents are numbered by type: QM (quality manual), SOP (procedure), WI (work instruction), FRM (form), SPEC (specification), DHF (design and development file) and RMF (risk management file). Revisions are lettered from A.',
+      'Documents are numbered by type: QM (quality manual), SOP (procedure), WI (work instruction), FRM (form), SPEC (specification), DHF (design and development file, keeping the legacy design history file prefix) and RMF (risk management file). Revisions are lettered from A.',
     () =>
       'Each document is drafted by its author, reviewed by someone other than the author, and approved by the process owner and {{qualityLead}} before release. Approvals are signed using {{eSignature}}.',
     () =>
@@ -197,7 +197,7 @@ export const CONTENT: Record<string, (Body | undefined)[]> = {
 
   'SW-SOP-002': [
     () => 'Applies to {{device}}. Determination: {{cyberStatus}}.',
-    () => 'Architecture views cover {{platforms}}. Threat modeling uses STRIDE and links threats to hazards in SOP-003.',
+    () => 'Architecture views cover {{platforms}}. Threat modeling uses STRIDE (spoofing, tampering, repudiation, information disclosure, denial of service, elevation of privilege) and links threats to hazards in SOP-003.',
     () => 'A machine-readable SBOM is generated from {{devTools}} for every release.',
     undefined,
     () => 'Security lead: {{secLead}}. Coordinated vulnerability disclosure contact: [security contact email].',

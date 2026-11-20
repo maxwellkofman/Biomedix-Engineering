@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "start": "node --disable-warning=ExperimentalWarning server/start.ts",
-    "staff": "node --disable-warning=ExperimentalWarning server/cli.ts"
+    "staff": "node --disable-warning=ExperimentalWarning server/cli.ts",
+    "check:docs": "node --disable-warning=ExperimentalWarning --import ./server/resolve-ts.mjs server/check-docs.ts"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.25.1",
