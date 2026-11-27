@@ -8,6 +8,10 @@ import type { GeneratedDoc, Suite } from '../templates/generate';
 
 export type QmsFile =
   | { kind: 'doc'; name: string; doc: GeneratedDoc }
+  /** A blank template derived from a controlled document: exported, but not a master-list entry. */
+  | { kind: 'template'; name: string; doc: GeneratedDoc }
+  /** A generated register or record (CSV or text). */
+  | { kind: 'text'; name: string; text: string; type: string }
   | { kind: 'gate-zero'; name: string }
   | { kind: 'master-list'; name: string }
   | { kind: 'readme'; name: string };
@@ -36,16 +40,34 @@ const folder = (name: string, purpose?: string, folders: QmsFolder[] = [], files
   files,
 });
 
-export const docFileName = (doc: GeneratedDoc) => safeName(`${doc.proc.id} ${doc.proc.title}`) + '.docx';
+export const docFileName = (doc: GeneratedDoc, ext = 'docx') => safeName(`${doc.proc.id} ${doc.proc.title}`) + '.' + ext;
 
-export function buildTree(suite: Suite, ix: Intake, tokens: TokenValues): QmsFolder {
+export interface TreeOptions {
+  /** Only these documents are exported (default: every required document). */
+  include?: (doc: GeneratedDoc) => boolean;
+  /** Blank CQV templates, as separate files under Forms and Templates. */
+  templates?: GeneratedDoc[];
+  /** Extra files in 05 Records/Equipment Validation (e.g. the equipment register). */
+  equipmentFiles?: QmsFile[];
+  /** Extra files in 05 Records/Document Control (e.g. the approval record). */
+  controlFiles?: QmsFile[];
+}
+
+export function buildTree(suite: Suite, ix: Intake, tokens: TokenValues, opts: TreeOptions = {}): QmsFolder {
+  const included = opts.include ? suite.applicable.filter(opts.include) : suite.applicable;
   const has = (id: string) => suite.applicable.some((d) => d.proc.id === id);
   const doc = (id: string): QmsFile[] => {
-    const d = suite.applicable.find((x) => x.proc.id === id);
+    const d = included.find((x) => x.proc.id === id);
     return d ? [{ kind: 'doc', name: docFileName(d), doc: d }] : [];
   };
+  const equipment = ix.equipment.items
+    .map((e) => ({
+      e,
+      docs: included.filter((d) => d.proc.id.startsWith(`${e.ref}-`)),
+    }))
+    .filter((x) => x.docs.length);
   const device = safeName(tokens.device?.value ?? (ix.device.name || 'Device'));
-  const procedures = suite.applicable.filter((d) => /^(SOP|SW-SOP)-/.test(d.proc.id));
+  const procedures = included.filter((d) => /^(SOP|SW-SOP)-/.test(d.proc.id));
 
   const records = folder('05 Records', 'Completed forms and records, one folder per process', [
     folder('Document Control', 'Change requests, master document list, external documents (SOP-001)'),
@@ -57,12 +79,24 @@ export function buildTree(suite: Suite, ix: Intake, tokens: TokenValues): QmsFol
     folder('Management Review', 'Management review records (SOP-012)'),
     ...(has('SOP-015') ? [folder('Equipment and Calibration', 'Equipment register and certificates (SOP-015)')] : []),
     ...(has('SOP-009') ? [folder('Process Validation', 'IQ, OQ and PQ protocols and reports (SOP-009)')] : []),
+    ...(equipment.length || opts.equipmentFiles?.length
+      ? [
+          folder(
+            'Equipment Validation',
+            'One package per piece of equipment: URS, plan, protocols, traceability and report (CQV-T1–8)',
+            equipment.map(({ e, docs }) =>
+              folder(`${e.ref} ${e.name.trim() || 'Unnamed equipment'}`, undefined, [], docs.map((d) => ({ kind: 'doc', name: docFileName(d), doc: d }))),
+            ),
+            opts.equipmentFiles ?? [],
+          ),
+        ]
+      : []),
     folder('Complaints and MDR', 'Complaint records and MDR decisions (SOP-016)'),
     folder('Corrections and Removals', 'Field action records (SOP-017)'),
     folder('Software Tool Validation', 'Software register, assurance records and the Part 11 assessment (SOP-014, FRM-019)', [], doc('FRM-019')),
     ...(!has('SOP-002') && has('RMF-001') ? [folder('Risk Management', 'Risk assessment and risk management records (SOP-003)', [], doc('RMF-001'))] : []),
   ]);
-  records.folders[0].files.push({ kind: 'master-list', name: 'FRM-002 Master Document List.csv' });
+  records.folders[0].files.push({ kind: 'master-list', name: 'FRM-002 Master Document List.csv' }, ...(opts.controlFiles ?? []));
 
   const designFile =
     has('SOP-002') &&
@@ -100,7 +134,21 @@ export function buildTree(suite: Suite, ix: Intake, tokens: TokenValues): QmsFol
       procedures.map((d) => ({ kind: 'doc', name: docFileName(d), doc: d })),
     ),
     folder('03 Work Instructions', 'Step-level instructions referenced by SOPs (WI-001, WI-002)'),
-    folder('04 Forms and Templates', 'Blank forms and record templates', [], [...doc('DHF-T1–7'), ...doc('S1–S8')]),
+    folder(
+      '04 Forms and Templates',
+      'Blank forms and record templates',
+      opts.templates?.length
+        ? [
+            folder(
+              'Equipment Validation Templates',
+              'CQV-T1 to CQV-T8 as separate files, from CQV-T1–8',
+              [],
+              opts.templates.map((d) => ({ kind: 'template', name: docFileName(d), doc: d })),
+            ),
+          ]
+        : [],
+      [...doc('DHF-T1–7'), ...doc('S1–S8'), ...doc('CQV-T1–8')],
+    ),
     records,
     ...(designFile ? [designFile] : []),
     folder(`07 Medical Device File - ${device}`, 'Index of released documents to build, test, label and ship (SOP-010)'),

@@ -13,6 +13,7 @@ import '../styles/app.css';
 import '../styles/flow.css';
 import '../styles/org.css';
 import '../styles/clean.css';
+import '../styles/equipment.css';
 
 export { docHref };
 
@@ -58,7 +59,10 @@ export default function Suite() {
   }
 
   const company = tokens.company?.value ?? 'your company';
-  const assessments = suite.applicable.filter((d) => d.progress && (d.progress.done < d.progress.total || d.progress.suggested));
+  // One line per assessment page: an equipment package spreads over several documents.
+  const assessments = suite.applicable
+    .filter((d) => d.progress && (d.progress.done < d.progress.total || d.progress.suggested))
+    .filter((d, i, all) => all.findIndex((x) => x.progress!.href === d.progress!.href) === i);
   const runNo = Number(params.get('run'));
   const run = runNo ? runs.find((r) => r.number === runNo) : undefined;
 
@@ -100,12 +104,15 @@ export default function Suite() {
                       downloadText(`${(tokens.company?.value ?? 'qms').replace(/\W+/g, '-')}-documentation-suite.md`, suiteToMarkdown(suite, tokens))
                     }
                   >
-                    Export all as Markdown
+                    One Markdown file
                   </button>
                 </div>
               )}
             </Popover>
-            <ButtonLink to="/app/publish">Publish or download</ButtonLink>
+            <ButtonLink to="/app/export" variant="outline">
+              Export all
+            </ButtonLink>
+            <ButtonLink to="/app/publish">Publish to SharePoint</ButtonLink>
           </div>
         </div>
 
@@ -162,7 +169,12 @@ export default function Suite() {
                     <span className="text-muted-sm">{docs.filter((d) => d.status !== 'na').length} required</span>
                   </div>
                   <ul className="list-reset">
-                    {docs.map((doc) => (
+                    {docs.map((doc, i) => [
+                      tier.key === 'eq' && /^EQ-\d+-/.test(doc.proc.id) && docs[i - 1]?.proc.id.split('-').slice(0, 2).join('-') !== doc.proc.id.split('-').slice(0, 2).join('-') && (
+                        <li key={`${doc.proc.id}-group`} className="eqv-suite-group">
+                          {doc.proc.id.split('-').slice(0, 2).join('-')} · {doc.proc.title.split(': ').slice(1).join(': ')}
+                        </li>
+                      ),
                       <li key={doc.proc.id} className={`doc-row${doc.status === 'na' ? ' doc-row--na' : ''}`}>
                         <Link to={docHref(doc.proc.id)} className="doc-row__link">
                           <span className="mono doc-row__id">{doc.proc.id}</span>
@@ -187,9 +199,14 @@ export default function Suite() {
                             )}
                           </span>
                         </Link>
-                      </li>
-                    ))}
+                      </li>,
+                    ])}
                   </ul>
+                  {tier.key === 'eq' && (
+                    <Link to="/app/equipment" className="mode-card__go">
+                      {intake.equipment.items.length ? 'Manage equipment →' : 'Add equipment to validate →'}
+                    </Link>
+                  )}
                 </section>
               );
             })}
@@ -206,7 +223,8 @@ export default function Suite() {
                     <li key={d.proc.id}>
                       <Link to={d.progress!.href} className="missing-list__item">
                         <span>
-                          {d.progress!.name[0].toUpperCase() + d.progress!.name.slice(1)} ({d.proc.id})
+                          {d.progress!.name[0].toUpperCase() + d.progress!.name.slice(1)}
+                          {d.proc.g === 'eq' ? '' : ` (${d.proc.id})`}
                         </span>
                         <span className="missing-list__count">
                           {d.progress!.total - d.progress!.done ? `${d.progress!.total - d.progress!.done} left` : `${d.progress!.suggested} to review`}

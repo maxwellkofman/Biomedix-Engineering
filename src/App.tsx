@@ -5,6 +5,8 @@ import { AppShell } from './components/AppShell';
 import Assessments from './pages/assessments/Assessments';
 import Part11Page from './pages/assessments/Part11';
 import RiskPage from './pages/assessments/Risk';
+import EquipmentPage from './pages/Equipment';
+import ExportPage from './pages/Export';
 import { ButtonLink } from './components/Button';
 import { useIntake } from './intake/IntakeContext';
 import { AcceptInvite, VerifyEmail } from './pages/auth/EmailLinks';
@@ -73,6 +75,8 @@ const TITLES: Record<string, string> = {
   '/app/assessments': 'Assessments · Biomedix Engineering',
   '/app/assessments/part11': 'Part 11 assessment · Biomedix Engineering',
   '/app/assessments/risk': 'Risk assessment · Biomedix Engineering',
+  '/app/equipment': 'Equipment validation · Biomedix Engineering',
+  '/app/export': 'Export all documents · Biomedix Engineering',
 };
 
 function useRouteChrome() {
@@ -201,6 +205,8 @@ export default function App() {
       <Route path="/app/history" element={app(<History />, true)} />
       <Route path="/app/assessments" element={app(<Assessments />)} />
       <Route path="/app/assessments/part11" element={app(<Part11Page />)} />
+      <Route path="/app/equipment" element={app(<EquipmentPage />)} />
+      <Route path="/app/export" element={app(<ExportPage />)} />
       <Route path="/app/assessments/risk" element={app(<RiskPage />)} />
       <Route path="/app/projects" element={<Navigate to="/app/dashboard#projects" replace />} />
       <Route path="/app/account" element={<Navigate to="/app/settings/profile" replace />} />

@@ -227,20 +227,30 @@ export function computeReadiness(
       to: `/app/setup/${pendingStep(q)}`,
     }),
   );
+  // One step per assessment page: an equipment package spreads its open items over several documents.
+  const byPage = new Map<string, DocReadiness[]>();
   docs
     .filter((d) => d.doc.progress && (d.doc.progress.done < d.doc.progress.total || d.doc.progress.suggested))
-    .forEach(({ doc }) => {
-      const pr = doc.progress!;
-      const left = pr.total - pr.done;
-      next.push({
-        key: `assess-${doc.proc.id}`,
-        title: `${pr.done ? 'Finish' : 'Start'} the ${pr.name}`,
-        detail: [left && `${plural(left, 'item')} left`, pr.suggested && `${plural(pr.suggested, 'suggestion')} to review`]
-          .filter(Boolean)
-          .join(' · ') + ` · fills ${doc.proc.id}`,
-        to: pr.href,
-      });
+    .forEach((d) => byPage.set(d.doc.progress!.href, [...(byPage.get(d.doc.progress!.href) ?? []), d]));
+  byPage.forEach((group, href) => {
+    const pr = group[0].doc.progress!;
+    const done = group.some((d) => d.doc.progress!.done > 0);
+    const left = group.length === 1 ? pr.total - pr.done : 0;
+    const suggested = Math.max(...group.map((d) => d.doc.progress!.suggested));
+    const ids = group.map((d) => d.doc.proc.id);
+    next.push({
+      key: `assess-${ids[0]}`,
+      title: `${done ? 'Finish' : 'Start'} the ${pr.name}`,
+      detail: [
+        left && `${plural(left, 'item')} left`,
+        suggested && `${plural(suggested, 'suggestion')} to review`,
+        `fills ${ids.length > 2 ? `${ids[0]} and ${ids.length - 1} more` : ids.join(' and ')}`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      to: href,
     });
+  });
   if (proposals.length)
     next.push({
       key: 'confirm',

@@ -63,7 +63,9 @@ In `npm run dev`, emails aren't sent: open **/dev/mail** to read them and follow
 | `/app/suite/:docId` | One tailored procedure, with Word/Markdown export and submit-for-review |
 | `/app/publish` | Publish to SharePoint: library preview, direct upload, ZIP download, PowerShell script |
 | `/app/readiness` | Compliance readiness: score, four checks per procedure, next steps, agent proposals, requirements matrix |
-| `/app/assessments` | Assessments overview: progress on the Part 11 and risk assessments |
+| `/app/assessments` | Assessments overview: progress on the Part 11 and risk assessments and equipment validation |
+| `/app/equipment` | Equipment validation (CQV): equipment register, impact assessment, user requirements, and each piece's validation package |
+| `/app/export` | Export all documents: Word or Markdown in the QMS folder layout, all or approved only, with the master list, equipment register and approval record |
 | `/app/assessments/part11` | 21 CFR Part 11 assessment: systems, scope, risk, controls, findings (writes FRM-019) |
 | `/app/assessments/risk` | ISO 14971 risk assessment: acceptability matrix, hazards, controls, residual and overall risk (writes RMF-001) |
 | `/app/history` | Run history: every saved run, the answers it changed and the documents it revised (account) |
@@ -120,6 +122,23 @@ Two assessments sit next to the procedures. Each is a checklist the customer wor
 - Overall residual risk (clause 8): method, benefits, disclosure and the decision.
 
 Both feed readiness: their checklist items count toward *Values filled*, unconfirmed suggestions toward *Agent proposals confirmed*, and FRM-019 and RMF-001 join the Part 11, ISO 14971, 4.1.6 and 7.1 rows of the requirements matrix.
+
+## Equipment validation (CQV)
+
+When new production, measuring or test equipment is brought in, `/app/equipment` drafts its commissioning, qualification and validation package. Answers are stored in `intake.equipment` (`src/equipment/model.ts`), up to 30 pieces per project.
+
+- **Equipment** comes from the setup answers (Operations → equipment) or is added by hand. Each gets a reference that is never reused (EQ-001) and a type guessed from its name: measuring or test instrument, production or process equipment, controlled environment or storage, automated test system, or utility.
+- **Impact assessment** (`src/equipment/summary.ts`): does it make, measure or inspect product or decide acceptance (direct impact); does it support a validated process or environment (indirect); is its output fully verified afterwards (if not, PQ, ISO 13485 7.5.6); calibration; software (none, fixed firmware, configurable, custom); electronic quality records (Part 11); factory and site acceptance tests.
+- **Documents** follow from the impact. Direct: URS, validation plan, commissioning record (when there is a FAT or SAT), IQ, OQ, PQ (when the output isn't fully verified), traceability matrix and summary report. Indirect: the same without PQ. No impact: URS and commissioning record only. Each is its own suite document (`EQ-001-URS`, `EQ-001-IQ`, …) with its own drafts, technical review and approval, because a URS is approved before purchase and a protocol before execution.
+- **User requirements** are suggested per equipment type and per answer (calibration, software, Part 11 records, machine safety) in `src/equipment/catalog.ts`, written to INCOSE rules with EARS patterns for alarms and interlocks. Values to fill are in [brackets]. Each requirement has an acceptance criterion, a test method and where it is verified (FAT, SAT, IQ, OQ, PQ or release review).
+- **Protocols** (`src/equipment/docs.ts`) number their steps (IQ-01, OQ-01…): standard checks first (identification, location, utilities, calibration, software version, configuration backup, maintenance, register), then one step per requirement verified there. Result, pass or fail and signature columns are left blank for execution. The traceability matrix maps each requirement to its step.
+- **Templates**: the same builders with an empty record give the blank templates CQV-T1 to CQV-T8. Together they are the controlled document **CQV-T1–8 Equipment Validation Templates** in the suite; the equipment page also downloads them as eight Word files, plus each package as a ZIP and the equipment register as CSV.
+
+The template wording passes the document checker with no findings (`npm run check:docs -- --intake <answers with equipment>`); the brackets in suggested requirements are reported as values still needed.
+
+## Export
+
+`/app/export` downloads every document in one ZIP, in the same folder layout as the SharePoint library: procedures, assessments, each equipment package under *05 Records/Equipment Validation*, and the template sets under *04 Forms and Templates*. Options: Word or Markdown; all documents or only those whose current draft is approved; the eight blank CQV templates as separate files. The master document list (FRM-002) carries each document's draft and status (draft, in technical review, reviewed, approved, changed since the last draft), and signed-in exports add an approval record with every submission, review and approval signature. The SharePoint ZIP and upload on `/app/publish` include the equipment packages too.
 
 ## Accounts, companies and roles
 
@@ -228,5 +247,6 @@ Rules can be switched off per browser on the *Rules* tab. Adding a rule means ad
 - `server/` holds the API: `api.ts` mounts the routes in `server/routes/` (auth, account, orgs, projects, requests, staff, dev); `access.ts` decides who can do what; `auth.ts` handles passwords, sessions and one-time links; `totp.ts` two-factor; `mail.ts` email; `audit.ts` the activity log; `db.ts` storage and migrations; `start.ts` the production server; `cli.ts` staff roles.
 - `src/data/` contains the review queue items and the procedure library content.
 - `src/assessments/` holds the Part 11 and risk assessment models, checks and document builders; `src/pages/assessments/` their pages.
+- `src/equipment/` holds equipment validation: the model, requirement catalog, impact and protocol logic, and the CQV document builders; `src/pages/Equipment.tsx` its page, `src/export/equipment.ts` its downloads, `src/pages/Export.tsx` the export page. `src/templates/blocks.ts` has the helpers both use to build documents from answers.
 - `src/validate/` holds the document checker (`rules.ts`, `catalog.ts`, `parse.ts`, `generated.ts`); `src/checker/` its results view; `server/check-docs.ts` the command line.
 - Text in square brackets (`[YOUR PRICE]`, `[Company]`, `[Reviewer name]`) is a placeholder waiting for real content.

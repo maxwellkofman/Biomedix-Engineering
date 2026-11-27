@@ -11,6 +11,7 @@ import type { Derived } from '../intake/derive';
 import type { Intake } from '../intake/model';
 import type { Block, DocProgress, GeneratedSection, Segment } from '../templates/generate';
 import type { P11Answer } from './model';
+import { ans, list, or, p, section, table, txt, yesNo } from '../templates/blocks';
 import {
   IMPACT_LABEL,
   outOfScopeReason,
@@ -43,44 +44,6 @@ export interface BuiltDoc {
   sections: Omit<GeneratedSection, 'n'>[];
   progress: DocProgress;
 }
-
-/*
- * Values the customer entered are marked while the document is assembled, and
- * txt() turns the marks into segments that carry the answer's label. The
- * document checker uses the label to tell assessment answers from template
- * wording; renderers only read `text`, so the marks never reach an export.
- */
-const MARK_RE = /\u0001([^\u0002]*)\u0002([^\u0003]*)\u0003|\[([A-Z][^\[\]\n]{2,80})\]/g;
-const mark = (label: string, value: string) => `\u0001${label}\u0002${value}\u0003`;
-const txt = (text: string): Segment[] => {
-  const out: Segment[] = [];
-  let last = 0;
-  for (const m of text.matchAll(MARK_RE)) {
-    if (m.index! > last) out.push({ kind: 'text', text: text.slice(last, m.index) });
-    // A bracketed phrase is an assessment item not answered yet.
-    out.push(m[3] !== undefined ? { kind: 'text', text: m[0], from: m[3], open: true } : { kind: 'text', text: m[2], from: m[1] });
-    last = m.index! + m[0].length;
-  }
-  if (last < text.length) out.push({ kind: 'text', text: text.slice(last) });
-  return out.length ? out : [{ kind: 'text', text }];
-};
-/** A customer-entered value, or the fallback when it's empty. A bracketed fallback names the answer. */
-const or = (v: string, fallback: string, label?: string) => {
-  const name = label ?? /^\[(.+)\]$/.exec(fallback)?.[1];
-  if (!v.trim()) return fallback;
-  return name ? mark(name, v.trim()) : v.trim();
-};
-const ans = (label: string, v: string) => (v.trim() ? mark(label, v.trim()) : '');
-const p = (segs: Segment[]): Block => ({ kind: 'p', segs });
-const list = (items: string[]): Block => ({ kind: 'list', items: items.map(txt) });
-const table = (head: string[], rows: string[][], widths?: number[]): Block => ({
-  kind: 'table',
-  head,
-  rows: rows.map((r) => r.map(txt)),
-  widths,
-});
-const yesNo = (v: string, yes = 'Yes', no = 'No') => (v === 'yes' ? yes : v === 'no' ? no : '[Not answered]');
-const section = (title: string, purpose: string, blocks: Block[]) => ({ title, purpose, blocks });
 
 /* ---------- FRM-019 ---------- */
 

@@ -1,4 +1,5 @@
 import { EMPTY_PART11, EMPTY_RISK, normalizePart11, normalizeRisk, type Part11Answers, type RiskAnswers } from '../assessments/model.ts';
+import { EMPTY_EQUIPMENT, normalizeEquipment, type EquipmentAnswers } from '../equipment/model.ts';
 
 /**
  * Everything the customer tells us: setup answers (all strings, so the form
@@ -75,6 +76,8 @@ export interface Intake {
   part11: Part11Answers;
   /** ISO 14971 risk assessment (RMF-001). */
   risk: RiskAnswers;
+  /** Equipment validation: one CQV package per piece of equipment. */
+  equipment: EquipmentAnswers;
 }
 
 export type IntakeSection = keyof Intake;
@@ -129,6 +132,7 @@ export const EMPTY_INTAKE: Intake = {
   team: { ceo: '', managementRep: '', quality: '', engineering: '', operations: '', regulatory: '', ml: '', security: '' },
   part11: EMPTY_PART11,
   risk: EMPTY_RISK,
+  equipment: EMPTY_EQUIPMENT,
 };
 
 /**
@@ -204,6 +208,7 @@ export const EXAMPLE_INTAKE: Intake = {
   },
   part11: EMPTY_PART11,
   risk: EMPTY_RISK,
+  equipment: EMPTY_EQUIPMENT,
 };
 
 export type StepId = 'company' | 'device' | 'technology' | 'regulatory' | 'operations' | 'quality' | 'team';
@@ -222,10 +227,11 @@ export const STEPS: { id: StepId; label: string; blurb: string }[] = [
 export function mergeIntake(partial: Partial<Intake> | undefined): Intake {
   const intake = { ...EMPTY_INTAKE } as Intake;
   for (const k of Object.keys(EMPTY_INTAKE) as IntakeSection[]) {
-    if (k === 'part11' || k === 'risk') continue;
+    if (k === 'part11' || k === 'risk' || k === 'equipment') continue;
     Object.assign(intake, { [k]: { ...EMPTY_INTAKE[k], ...(partial?.[k] ?? {}) } });
   }
   intake.part11 = normalizePart11(partial?.part11);
   intake.risk = normalizeRisk(partial?.risk);
+  intake.equipment = normalizeEquipment(partial?.equipment);
   return intake;
 }

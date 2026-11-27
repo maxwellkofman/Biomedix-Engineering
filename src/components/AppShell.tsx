@@ -13,8 +13,8 @@ import '../styles/org.css';
 /** Four places. Everything else is reached from one of them. */
 const NAV = [
   { label: 'Home', to: '/app/dashboard', also: ['/app/start', '/app/welcome', '/app/help'] },
-  { label: 'Documents', to: '/app/suite', also: ['/app/setup', '/app/form', '/app/publish', '/app/history', '/app/readiness', '/app/procedures'] },
-  { label: 'Assessments', to: '/app/assessments' },
+  { label: 'Documents', to: '/app/suite', also: ['/app/setup', '/app/form', '/app/publish', '/app/history', '/app/readiness', '/app/procedures', '/app/export'] },
+  { label: 'Assessments', to: '/app/assessments', also: ['/app/equipment'] },
   { label: 'Reviews', to: '/app/review' },
 ];
 

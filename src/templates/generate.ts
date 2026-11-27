@@ -3,6 +3,8 @@ import { TOKENS, type Derived, type TokenKey, type TokenValues } from '../intake
 import type { Intake } from '../intake/model';
 import { CONTENT, type TemplateCtx } from './content';
 import { ASSESSMENT_DOCS } from '../assessments/docs';
+import { docProgress, packageDocs, RECORDS, templatesDoc } from '../equipment/docs';
+import { kindLabel, PHASE_SUMMARY, PHASE_WHEN } from '../equipment/summary';
 
 /* ---------- Output shapes ---------- */
 
@@ -111,7 +113,7 @@ export function isFilled(tokens: TokenValues, key: TokenKey): boolean {
 
 /* ---------- Applicability ---------- */
 
-interface Applicability {
+export interface Applicability {
   applies: boolean;
   reason?: string;
   pending?: string;
@@ -146,6 +148,13 @@ function applicability(p: Procedure, ix: Intake, d: Derived): Applicability {
           reason: 'no manufacturing process whose output cannot be fully verified; software builds are verified at release under SOP-008.',
         };
       return d.hasHardware === null ? { applies: true, pending: 'Does the device include hardware?' } : { applies: true };
+    case 'CQV-T1–8': {
+      const named = ix.equipment.items.length > 0 || !!ix.operations.equipment.trim() || ix.operations.manufacturing === 'in-house';
+      if (named || d.hasHardware === true) return { applies: true };
+      if (d.hasHardware === false)
+        return { applies: false, reason: 'no production, measuring or test equipment is named, and the device has no hardware.' };
+      return { applies: true, pending: 'Does the device include hardware?' };
+    }
     case 'SOP-015':
       return needs(
         d.hasHardware,
@@ -172,6 +181,60 @@ function ownerToken(owner: string): TokenKey {
 
 /* ---------- Build ---------- */
 
+export const numberSections = (list: Omit<GeneratedSection, 'n'>[]): GeneratedSection[] =>
+  list.map((s, i) => ({ ...s, n: String(i + 1).padStart(2, '0') }));
+
+/** A generated document from its sections: header, used and missing values, status. */
+export function assembleDoc(
+  p: Procedure,
+  a: Applicability,
+  owner: TokenKey,
+  sections: GeneratedSection[],
+  tokens: TokenValues,
+  progress?: DocProgress,
+  extraHeader: [string, Segment[]][] = [],
+): GeneratedDoc {
+  const header: [string, Segment[]][] = [
+    ['Document', parseSegments(`${p.id} ${p.title}`)],
+    ['Organization', parseSegments('{{company}}')],
+    ['Device in scope', parseSegments('{{device}}')],
+    ...extraHeader,
+    ['Revision', parseSegments('A (initial release)')],
+    ['Owner', parseSegments(`{{${owner}}}`)],
+    ['Approved by', parseSegments(p.g === 'eq' ? '{{qualityLead}}' : '{{mgmtRep}}')],
+    ['Basis', parseSegments(p.basis)],
+  ];
+
+  const used = new Set<TokenKey>();
+  const collect = (segs: Segment[]) => segs.forEach((s) => s.kind === 'token' && used.add(s.key));
+  header.forEach(([, segs]) => collect(segs));
+  sections.forEach((s) =>
+    s.blocks.forEach((b) =>
+      b.kind === 'p' ? collect(b.segs) : b.kind === 'list' ? b.items.forEach(collect) : b.rows.forEach((r) => r.forEach(collect)),
+    ),
+  );
+  const usedList = [...used];
+  const missing = usedList.filter((k) => !isFilled(tokens, k));
+  const parts = usedList.length + (progress?.total ?? 0);
+  const filledPct = parts ? Math.round(((usedList.length - missing.length + (progress?.done ?? 0)) / parts) * 100) : 100;
+
+  return {
+    proc: p,
+    tierName: TIERS.find((t) => t.key === p.g)?.name ?? '',
+    status: !a.applies ? 'na' : missing.length || (progress && progress.done < progress.total) ? 'input' : 'ready',
+    reason: a.reason,
+    pending: a.pending,
+    ownerToken: owner,
+    header,
+    sections,
+    used: usedList,
+    missing,
+    filledPct,
+    progress,
+  };
+}
+
+
 const genericBody = (purpose: string) =>
   `${purpose}.\n\nScope at {{company}}: {{device}}. Responsible: OWNER.`;
 
@@ -180,64 +243,57 @@ export function buildSuite(ix: Intake, d: Derived, tokens: TokenValues): Suite {
   const applicableProcs = app.filter((x) => x.a.applies).map((x) => x.p);
   const excluded = app.filter((x) => !x.a.applies).map((x) => ({ proc: x.p, reason: x.a.reason ?? '' }));
 
+
   const docs = app.map(({ p, a }): GeneratedDoc => {
-    const tierName = TIERS.find((t) => t.key === p.g)?.name ?? '';
     const owner = ownerToken(p.owner);
     const ctx: TemplateCtx = { ix, d, applicable: applicableProcs, excluded, owner: `{{${owner}}}` };
     const bodies = CONTENT[p.id] ?? [];
 
     const built = ASSESSMENT_DOCS[p.id]?.({ ix, d, tpl: parseSegments, tplBlocks: parseBlocks });
-    const sections =
-      built?.sections.map((s, i) => ({ ...s, n: String(i + 1).padStart(2, '0') })) ??
-      p.sections.map((s, i) => {
-        const body = bodies[i]?.(ctx) ?? genericBody(s.d);
-        return {
-          n: String(i + 1).padStart(2, '0'),
-          title: s.t,
-          purpose: s.d,
-          blocks: parseBlocks(body.replace(/OWNER/g, `{{${owner}}}`)),
-        };
-      });
-
-    const header: [string, Segment[]][] = [
-      ['Document', parseSegments(`${p.id} ${p.title}`)],
-      ['Organization', parseSegments('{{company}}')],
-      ['Device in scope', parseSegments('{{device}}')],
-      ['Revision', parseSegments('A (initial release)')],
-      ['Owner', parseSegments(`{{${owner}}}`)],
-      ['Approved by', parseSegments('{{mgmtRep}}')],
-      ['Basis', parseSegments(p.basis)],
-    ];
-
-    const used = new Set<TokenKey>();
-    const collect = (segs: Segment[]) => segs.forEach((s) => s.kind === 'token' && used.add(s.key));
-    header.forEach(([, segs]) => collect(segs));
-    sections.forEach((s) =>
-      s.blocks.forEach((b) =>
-        b.kind === 'p' ? collect(b.segs) : b.kind === 'list' ? b.items.forEach(collect) : b.rows.forEach((r) => r.forEach(collect)),
-      ),
-    );
-    const usedList = [...used];
-    const missing = usedList.filter((k) => !isFilled(tokens, k));
-    const progress = built?.progress;
-    const parts = usedList.length + (progress?.total ?? 0);
-    const filledPct = parts ? Math.round(((usedList.length - missing.length + (progress?.done ?? 0)) / parts) * 100) : 100;
-
-    return {
-      proc: p,
-      tierName,
-      status: !a.applies ? 'na' : missing.length || (progress && progress.done < progress.total) ? 'input' : 'ready',
-      reason: a.reason,
-      pending: a.pending,
-      ownerToken: owner,
-      header,
-      sections,
-      used: usedList,
-      missing,
-      filledPct,
-      progress,
-    };
+    const sections = built
+      ? numberSections(built.sections)
+      : p.id === 'CQV-T1–8'
+        ? numberSections(templatesDoc(parseSegments))
+        : p.sections.map((s, i) => {
+            const body = bodies[i]?.(ctx) ?? genericBody(s.d);
+            return {
+              n: String(i + 1).padStart(2, '0'),
+              title: s.t,
+              purpose: s.d,
+              blocks: parseBlocks(body.replace(/OWNER/g, `{{${owner}}}`)),
+            };
+          });
+    return assembleDoc(p, a, owner, sections, tokens, built?.progress);
   });
+
+  // One package per piece of equipment, after the fixed procedures.
+  for (const e of ix.equipment.items) {
+    for (const x of packageDocs(e, parseSegments)) {
+      const proc: Procedure = {
+        g: 'eq',
+        id: x.id,
+        title: x.title,
+        basis:
+          x.phase === 'URS' || x.phase === 'VP'
+            ? 'ISO 13485 6.3, 7.5.6, 7.6; 21 CFR 820.10'
+            : x.phase === 'PQ'
+              ? 'ISO 13485 7.5.6; GHTF SG3/N99-10'
+              : 'ISO 13485 6.3, 7.5.6, 7.6; GHTF SG3/N99-10',
+        owner: x.owner === 'opsLead' ? 'Operations' : 'Engineering',
+        when: PHASE_WHEN[x.phase],
+        summary: PHASE_SUMMARY[x.phase],
+        sections: [],
+        records: RECORDS[x.phase],
+        creates: [],
+        checks: [],
+      };
+      docs.push(
+        assembleDoc(proc, { applies: true }, x.owner, numberSections(x.sections), tokens, docProgress(x), [
+          ['Equipment', parseSegments(`${e.ref} ${e.name.trim() || 'Unnamed equipment'} (${kindLabel(e)})`)],
+        ]),
+      );
+    }
+  }
 
   const applicable = docs.filter((x) => x.status !== 'na');
   const totalUsed = applicable.reduce((n, x) => n + x.used.length + (x.progress?.total ?? 0), 0);

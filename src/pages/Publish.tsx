@@ -21,14 +21,14 @@ import { openItems } from '../templates/generate';
 import '../styles/app.css';
 import '../styles/flow.css';
 
-function FolderIcon() {
+export function FolderIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" />
     </svg>
   );
 }
-function DocIcon() {
+export function DocIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <path d="M3.5 1.5h6l3 3v10h-9z" />
@@ -37,7 +37,7 @@ function DocIcon() {
   );
 }
 
-function Tree({ folder, depth = 0 }: { folder: QmsFolder; depth?: number }) {
+export function Tree({ folder, depth = 0 }: { folder: QmsFolder; depth?: number }) {
   return (
     <ul className={`list-reset tree${depth ? ' tree--nested' : ''}`}>
       {folder.folders.map((f) => (
@@ -253,6 +253,9 @@ export default function Publish() {
               <Button variant="outline" onClick={downloadZip} disabled={busy !== ''}>
                 {busy === 'zip' ? zipProgress || 'Preparing…' : 'Download QMS folder (.zip)'}
               </Button>
+              <Link to="/app/export" className="text-sm">
+                More options: Markdown, approved only, approval record →
+              </Link>
             </section>
 
             <section aria-labelledby="ps-h" className="card card--compact method">

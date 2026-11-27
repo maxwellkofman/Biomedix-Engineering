@@ -161,7 +161,8 @@ export const projectRoutes: Route[] = [
     const score = readiness(c.body) ?? 0;
     const note = str(c.body, 'note', { max: 500 });
     const docs = c.body.docs;
-    if (!Array.isArray(docs) || docs.length > 80) throw new HttpError(400, 'docs must be a list of documents.');
+    // 27 procedures and assessments plus up to 30 equipment packages of 8 documents each.
+    if (!Array.isArray(docs) || docs.length > 300) throw new HttpError(400, 'docs must be a list of documents.');
     const parsed = docs.map((d: Json) => ({
       id: str(d, 'id', { max: 40, required: true }),
       title: str(d, 'title', { max: 200, required: true }),

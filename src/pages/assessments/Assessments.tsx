@@ -4,6 +4,7 @@ import { StageTag } from '../../components/Lifecycle';
 import { useIntake } from '../../intake/IntakeContext';
 import { summarizePart11 } from '../../assessments/part11';
 import { summarizeRisk } from '../../assessments/risk';
+import { summarizeEquipment } from '../../equipment/summary';
 import { docHref } from '../../lib/links';
 import { plural, Progress } from './parts';
 
@@ -11,6 +12,9 @@ export default function Assessments() {
   const { intake, derived, suite, lives, mode } = useIntake();
   const p11 = summarizePart11(intake);
   const risk = summarizeRisk(intake, derived);
+  const eq = intake.equipment.items.map(summarizeEquipment);
+  const eqSum = { done: eq.reduce((n, x) => n + x.done, 0), total: eq.reduce((n, x) => n + x.total, 0) };
+  const eqDocs = eq.reduce((n, x) => n + x.phases.length, 0);
   const cards = [
     {
       id: 'FRM-019',
@@ -39,6 +43,20 @@ export default function Assessments() {
         risk.pending.length ? `${plural(risk.pending.length, 'suggested hazard')} to review` : '',
       ],
       go: risk.hazards.length ? 'Continue the assessment →' : 'Start with the suggested hazards →',
+    },
+    {
+      id: 'CQV-T1–8',
+      to: '/app/equipment',
+      eyebrow: 'EQUIPMENT VALIDATION',
+      title: 'Commissioning and qualification',
+      body: 'For each new piece of equipment: an impact assessment, user requirements, and the validation package it calls for, from the URS to IQ, OQ and PQ protocols and the summary report.',
+      sum: eqSum,
+      facts: [
+        plural(eq.length, 'piece', 'pieces') + ' of equipment',
+        plural(eqDocs, 'document'),
+        eq.filter((x) => !x.impact).length ? `${eq.filter((x) => !x.impact).length} without an impact assessment` : '',
+      ],
+      go: eq.length ? 'Continue →' : 'Add your first piece of equipment →',
     },
   ];
   return (

@@ -1,4 +1,4 @@
-export type TierKey = 't1' | 't2' | 't3' | 'sw' | 'as';
+export type TierKey = 't1' | 't2' | 't3' | 'sw' | 'as' | 'eq';
 
 export interface ProcedureSection {
   /** Section title */
@@ -28,14 +28,15 @@ export const AGENT_FOR_PROCEDURE: Record<string, string> = {
   'SOP-008': 'Trace agent', 'SOP-009': 'Trace agent', 'SOP-010': 'Submission agent', 'SOP-011': 'CAPA agent', 'SOP-012': 'CAPA agent',
   'SOP-013': 'Submission agent', 'SOP-014': 'Trace agent', 'SOP-015': 'Trace agent',
   'SW-SOP-001': 'Design controls agent', 'SW-SOP-002': 'Risk agent', 'SW-SOP-003': 'Change agent', 'S1–S8': 'Submission agent',
-  'FRM-019': 'Trace agent', 'RMF-001': 'Risk agent'
+  'FRM-019': 'Trace agent', 'RMF-001': 'Risk agent', 'CQV-T1–8': 'Trace agent'
 };
 export const TIERS: { key: TierKey; name: string }[] = [
   { key: 't1', name: 'FOUNDATION · BEFORE DESIGN WORK' },
   { key: 't2', name: 'OPERATE · BEFORE VERIFICATION' },
   { key: 't3', name: 'MARKET · BEFORE DISTRIBUTION' },
   { key: 'sw', name: 'SaMD AND AI' },
-  { key: 'as', name: 'ASSESSMENTS · KEPT CURRENT THROUGH THE LIFECYCLE' }
+  { key: 'as', name: 'ASSESSMENTS · KEPT CURRENT THROUGH THE LIFECYCLE' },
+  { key: 'eq', name: 'EQUIPMENT VALIDATION · ONE PACKAGE PER PIECE OF EQUIPMENT' }
 ];
 function S(t: string, d: string): ProcedureSection {
   return { t, d };
@@ -122,7 +123,10 @@ export const PROCEDURES: Procedure[] = [
     records: ['FRM-019 21 CFR Part 11 Assessment', 'FRM-017 Software Assurance Record'], creates: ['Part 11 finding'], checks: ['System holds signed records with no Part 11 assessment', 'Gap with no corrective action', 'Electronic signatures relied on before the 11.100(c) letter'] },
   { g: 'as', id: 'RMF-001', title: 'Risk Assessment', basis: 'ISO 14971:2019 clauses 5–8; ISO/TR 24971:2020', owner: 'Quality and Engineering', when: 'Before design inputs are frozen; updated through the lifecycle', summary: 'Hazards are identified for the device, each risk estimated and evaluated against the SOP-003 matrix, controlled and verified, and residual risk judged on its own and overall.',
     sections: [S('Scope', 'Device, intended use, users and lifecycle'), S('Risk acceptability criteria', 'Severity and probability scales and the matrix'), S('Hazard identification', 'Method and hazards by category'), S('Risk estimation and evaluation', 'Sequence of events, hazardous situation, harm, severity, probability'), S('Risk control and verification', 'Control priority, implementation and effectiveness evidence'), S('Residual risk evaluation', 'Risk after control, new hazards, benefit-risk'), S('Overall residual risk', 'Method, benefits, disclosure and decision'), S('Open items and review notes', 'What is left and reviewer notes')],
-    records: ['RMF-001 Risk Assessment', 'Risk management report'], creates: ['Hazard', 'Risk control'], checks: ['Risk control without verification of effectiveness', 'Hazard with no control decision', 'Residual risk not acceptable with no benefit-risk rationale'] }
+    records: ['RMF-001 Risk Assessment', 'Risk management report'], creates: ['Hazard', 'Risk control'], checks: ['Risk control without verification of effectiveness', 'Hazard with no control decision', 'Residual risk not acceptable with no benefit-risk rationale'] },
+  { g: 'eq', id: 'CQV-T1–8', title: 'Equipment Validation Templates', basis: 'ISO 13485 6.3, 7.5.6, 7.6; GHTF SG3/N99-10; ASTM E2500', owner: 'Operations and Quality', when: 'Before new equipment is bought', summary: 'Eight templates for commissioning, qualification and validation (CQV): from user requirements to the report that releases the equipment for use, sized by its impact on product.',
+    sections: [S('Using these templates', 'Equipment IDs, document IDs and which templates apply'), S('T1 User requirements specification', 'Testable requirements with acceptance criteria and where each is verified'), S('T2 Validation plan', 'Impact assessment, approach, roles, deviations and revalidation'), S('T3 Commissioning record', 'Factory and site acceptance tests and the punch list'), S('T4 Installation qualification', 'Identity, installation, utilities, documentation, calibration'), S('T5 Operational qualification', 'Functions across operating ranges, alarms, interlocks and software'), S('T6 Performance qualification', 'Consistent performance over routine runs'), S('T7 Traceability matrix', 'Each requirement to its verification and result'), S('T8 Validation summary report', 'Results, deviations and the release decision')],
+    records: ['EQ-NNN validation packages', 'FRM-018 Equipment Register'], creates: ['Equipment'], checks: ['Equipment in use with no approved summary report', 'Essential requirement with no passing result'] },
 ];
 
 /** The expert-service line shown under the sign-off path for a procedure. */
@@ -133,6 +137,7 @@ export function reviewOfferFor(id: string): string {
   if (id === 'SOP-012')
     return 'Available: technical review of the record. Management review itself stays with your top management.';
   if (id === 'FRM-019') return 'Available: a Biomedix engineer checks each system’s evidence against Part 11 before signing the technical review.';
+  if (id === 'CQV-T1–8') return 'Available: a Biomedix validation engineer reviews each equipment package and its executed protocols before release.';
   if (id === 'RMF-001') return 'Available: an independent engineer challenges the hazard list and severity ratings at technical review.';
   return 'Every agent output gets a Biomedix technical review before it goes to your approvers.';
 }

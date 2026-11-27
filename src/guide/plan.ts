@@ -44,7 +44,8 @@ export function buildPlan(
   const described = !!(ix.device.description.trim() || ix.device.name.trim());
   const questionsLeft = opts.questionsLeft;
   const proposals = readiness.proposals.length;
-  const assessments = suite.applicable.filter((d) => d.progress);
+  // Equipment packages are drafted as equipment arrives; they don't hold up the first release.
+  const assessments = suite.applicable.filter((d) => d.progress && d.proc.g !== 'eq');
   const assessLeft = assessments.reduce((n, d) => n + (d.progress!.total - d.progress!.done) + d.progress!.suggested, 0);
   const docs = readiness.docs;
   const n = docs.length;

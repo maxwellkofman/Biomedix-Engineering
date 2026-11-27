@@ -175,7 +175,7 @@ export default function DocumentView() {
         {doc.progress && (
           <section className="card card--compact" aria-labelledby="assess-h">
             <h2 id="assess-h" className="card__title card__title--sm">
-              Assessment
+              {doc.proc.g === 'eq' ? 'Equipment package' : 'Assessment'}
             </h2>
             <div className="meter" aria-hidden="true">
               <span className="meter__fill" style={{ width: `${Math.round((doc.progress.done / Math.max(1, doc.progress.total)) * 100)}%` }} />

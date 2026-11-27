@@ -10,7 +10,8 @@ import type { CheckDoc, CheckOptions, DocType, Report, Span, Unit, UnitKind } fr
 
 export function docTypeFor(id: string): DocType {
   if (/^(?:SOP|QM|SW-SOP|WI)-/.test(id)) return 'procedure';
-  if (/^DHF-T/.test(id)) return 'requirements';
+  if (/^DHF-T/.test(id) || /^EQ-\d+-URS$/.test(id)) return 'requirements';
+  if (/^EQ-\d+-(?:VP|CX|IQ|OQ|PQ|RTM|VSR)$/.test(id) || /^CQV-T/.test(id)) return 'record';
   if (/^S\d/.test(id)) return 'submission';
   if (/^RMF-/.test(id)) return 'risk';
   if (/^FRM-/.test(id)) return 'record';
